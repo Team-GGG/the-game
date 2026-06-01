@@ -153,10 +153,10 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
 }
 
 int main() {
-
+  
   WindowState window = (WindowState){.width = 1600, .height = 896, .fps = 60};
   PlatformState platform = (PlatformState){.tile_width = 32, .tile_height = 32};
-
+  SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   InitWindow(window.width, window.height, "GGG");
 
   Texture2D background = LoadTexture("resources/bg/bg.png");
@@ -169,17 +169,26 @@ int main() {
                                         .tile_height = 32};
 
   SetTargetFPS(window.fps);
-
+  RenderTexture2D ForAdaptableScreen = LoadRenderTexture(1600,896);
   while (!WindowShouldClose()) {
+    if (IsKeyPressed(KEY_A)){
+      ToggleFullscreen();
+    }
+    BeginTextureMode(ForAdaptableScreen);
+      ClearBackground(RAYWHITE);
+      DrawTexture(background, 0, 0, WHITE);
+      DrawPlatform(&window, &platform, &tileset);
+    EndTextureMode();
 
     BeginDrawing();
-
     ClearBackground(RAYWHITE);
-    DrawTexture(background, 0, 0, WHITE);
-    DrawPlatform(&window, &platform, &tileset);
-
-    EndDrawing();
-  }
+    DrawTexturePro(
+      ForAdaptableScreen.texture,
+      (Rectangle){0,0,(float)ForAdaptableScreen.texture.width,-(float)ForAdaptableScreen.texture.height},
+      (Rectangle){0,0,(float)GetScreenWidth(),(float)GetScreenHeight()},
+      (Vector2){0,0},0.0f,WHITE 
+  );
+   EndDrawing();}
 
   UnloadTexture(background);
   UnloadTexture(tileset_texture);
