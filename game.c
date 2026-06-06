@@ -40,12 +40,187 @@ typedef struct {
 
   Rectangle *player;
   float speed;
-  float acceleration;
+  float falling_speed;
+  float gravity;
+
+  int jump_count;
+  float jump_time_needed;
+  float jump_time_passed;
 
 } PlayerState;
 
+typedef struct {
+
+  Texture2D sheet;
+  int rows;
+  int cols;
+
+} SpriteSheetState;
+
+typedef enum { IDLE, RUN, RUN_BACK, JUMP } PlayerMode;
+
+typedef struct {
+
+  PlayerMode mode;
+  float time_needed;
+  float time_passed;
+  SpriteSheetState sprite;
+
+  int frame_count;
+  int current_frame_no;
+
+  Rectangle current_frame_rec;
+
+} AnimationState;
+
+typedef struct {
+
+  int i;
+  int j;
+  int rows;
+  int cols;
+
+  Rectangle *rec;
+
+} TileInformation;
+
+void CollisionResponse(TileInformation *tile_info, PlayerState *player_state,
+                       const short data[]) {
+
+  bool X =
+      (tile_info->rec->y + tile_info->rec->height < player_state->player->y) ||
+      (player_state->player->y + player_state->player->height <
+       tile_info->rec->y);
+
+  bool Y =
+      (tile_info->rec->x + tile_info->rec->width < player_state->player->x) ||
+      (player_state->player->x + player_state->player->width <
+       tile_info->rec->x);
+
+  if (!X && !Y) {
+
+    bool left = false;
+    bool right = false;
+    bool up = false;
+    bool down = false;
+
+    int i = tile_info->i;
+    int j = tile_info->j;
+    int rows = tile_info->rows;
+    int cols = tile_info->cols;
+
+    if ((i > 0) && (data[(i - 1) * cols + j])) {
+      up = true;
+    }
+
+    if ((i <= rows - 2) && (data[(i + 1) * cols + j])) {
+      down = true;
+    }
+
+    if ((j > 0) && (data[i * cols + (j - 1)])) {
+      left = true;
+    }
+
+    if ((j <= cols - 2) && (data[i * cols + (j + 1)])) {
+      right = true;
+    }
+
+    // printf("left: %d + right: %d + up: %d + down: %d\n", left, right, up, down);
+
+    if (up && down) {
+
+      if ((player_state->player->x) >= (tile_info->rec->x)) {
+        player_state->player->x = tile_info->rec->x + tile_info->rec->width;
+      }
+
+      else {
+        player_state->player->x =
+            tile_info->rec->x - player_state->player->width;
+      }
+
+    }
+
+    else if (left && right) {
+
+      if ((player_state->player->y) <= (tile_info->rec->y)) {
+        player_state->player->y =
+            tile_info->rec->y - player_state->player->height;
+      }
+
+      else {
+        player_state->player->y = tile_info->rec->y + tile_info->rec->height;
+      }
+    }
+
+    else if (left && down && !up && !right) {
+
+      if ((player_state->player->y + player_state->player->height) <=
+          (tile_info->rec->y + 5)) {
+        player_state->player->y =
+            tile_info->rec->y - player_state->player->height;
+      }
+
+      else {
+        player_state->player->x = tile_info->rec->x + tile_info->rec->width;
+      }
+    }
+
+    else if (right && down && !up && !left) {
+
+      if ((player_state->player->y + player_state->player->height) <=
+          (tile_info->rec->y + 5)) {
+        player_state->player->y =
+            tile_info->rec->y - player_state->player->height;
+      }
+
+      else {
+        player_state->player->x =
+            tile_info->rec->x - player_state->player->width;
+      }
+    }
+
+    else if (right && !down && !up && !left) {
+
+      if ((player_state->player->y + player_state->player->height) <=
+          (tile_info->rec->y + 5)) {
+        player_state->player->y =
+            tile_info->rec->y - player_state->player->height;
+      }
+
+      else if ((player_state->player->y) >=
+               (tile_info->rec->y + tile_info->rec->height - 5)) {
+        player_state->player->y = tile_info->rec->y + tile_info->rec->height;
+      }
+
+      else {
+        player_state->player->x =
+            tile_info->rec->x - player_state->player->width;
+      }
+    }
+
+    else if (left && !down && !up && !right) {
+
+      if ((player_state->player->y + player_state->player->height) <=
+          (tile_info->rec->y + 5)) {
+        player_state->player->y =
+            tile_info->rec->y - player_state->player->height;
+      }
+
+      else if ((player_state->player->y) >=
+               (tile_info->rec->y + tile_info->rec->height - 5)) {
+        player_state->player->y = tile_info->rec->y + tile_info->rec->height;
+      }
+
+      else {
+        player_state->player->x =
+            tile_info->rec->x + tile_info->rec->width;
+      }
+    }
+  }
+}
+
 void DrawPlatform(WindowState *window, PlatformState *platform,
-                  TilemapState *tilemap) {
+                  TilemapState *tilemap, PlayerState *player_state) {
 
   const int cols = tilemap->width / platform->tile_width;
   const int rows = tilemap->height / platform->tile_height;
@@ -195,52 +370,69 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
       current_tile.x = in_x_dir * tilemap->tileset->tile_width;
       current_tile.y = in_y_dir * tilemap->tileset->tile_height;
 
+      Rectangle current_tile_rec =
+          (Rectangle){.x = j * 32, .y = i * 32, .width = 32, .height = 32};
+
+      TileInformation tile_info = (TileInformation){
+          .i = i, .j = j, .rows = rows, .cols = cols, .rec = &current_tile_rec};
+
+      CollisionResponse(&tile_info, player_state, data);
+
       DrawTextureRec(*(tilemap->tileset->texture), current_tile,
                      (Vector2){.x = j * 32, .y = i * 32}, WHITE);
     }
   }
 }
 
-void Update(PlayerState *player_state, Camera2D *camera,
-            TilemapState *tilemap) {
+
+void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
+            PlayerMode *mode) {
+
+
+  if (IsKeyPressed(KEY_SPACE)) {
+    *mode = JUMP;
+    return;
+  }
 
   if (IsKeyDown(KEY_LEFT)) {
     player_state->player->x -= player_state->speed;
+    *mode = RUN_BACK;
   }
 
-   if (IsKeyDown(KEY_RIGHT)) {
+  else if (IsKeyDown(KEY_RIGHT)) {
     player_state->player->x += player_state->speed;
+    *mode = RUN;
   }
 
-   if (IsKeyDown(KEY_DOWN)) {
-    player_state->player->y += player_state->speed;
+  else {
+    *mode = IDLE;
   }
 
-   if (IsKeyDown(KEY_UP)) {
-    player_state->player->y -= player_state->speed;
+  if (IsKeyPressed(KEY_P)) {
+    (camera->zoom + 0.1 <= 2) ? (camera->zoom += 0.1) : (camera->zoom);
   }
 
-
-
-   int buffer_y = 4;
+  if (IsKeyPressed(KEY_M)) {
+    (camera->zoom - 0.1 >= 1) ? (camera->zoom -= 0.1) : (camera->zoom);
+  }
 
   if (player_state->player->x < 0) {
     player_state->player->x = 0;
   }
 
-   if (player_state->player->x >
-           (tilemap->width - player_state->player->width)) {
+  if (player_state->player->x >
+      (tilemap->width - player_state->player->width)) {
     player_state->player->x = tilemap->width - player_state->player->width;
   }
 
+  if (player_state->player->y < 0) {
+    player_state->player->y = 4;
+  }
 
-   if (player_state->player->y < 0) {
-     player_state->player->y = buffer_y;
-   }
-
-   if (player_state->player->y >
-           (tilemap->height - player_state->player->height)) {
-    player_state->player->y = tilemap->height - player_state->player->height - buffer_y;
+  if (player_state->player->y >
+      (tilemap->height - player_state->player->height)) {
+    player_state->player->y =
+        tilemap->height - player_state->player->height - 4;
   }
 
   camera->target =
@@ -249,6 +441,14 @@ void Update(PlayerState *player_state, Camera2D *camera,
   // KEY_D checking is for only debugging.
 
   if (!IsKeyDown(KEY_D)) {
+
+    if (IsKeyDown(KEY_DOWN)) {
+      player_state->player->y += player_state->speed;
+    }
+
+    if (IsKeyDown(KEY_UP)) {
+      player_state->player->y -= player_state->speed;
+    }
 
     if ((camera->target.x) - (GetScreenWidth() / (2.0 * camera->zoom)) <= 0) {
       camera->target.x = camera->offset.x / (camera->zoom);
@@ -269,6 +469,94 @@ void Update(PlayerState *player_state, Camera2D *camera,
     }
   }
 }
+
+void AnimatePlayer(AnimationState *animation_state, PlayerState *player_state) {
+  float time_passed = animation_state->time_passed + GetFrameTime();
+
+  if (time_passed > animation_state->time_needed) {
+    animation_state->time_passed = 0;
+
+    animation_state->current_frame_no++;
+
+    if (animation_state->current_frame_no >= animation_state->frame_count) {
+      animation_state->current_frame_no = 0;
+    }
+  }
+
+  else {
+    animation_state->time_passed = time_passed;
+  }
+
+  animation_state->current_frame_rec.x =
+      animation_state->current_frame_no *
+      animation_state->current_frame_rec.width;
+
+  DrawTextureRec(animation_state->sprite.sheet,
+                 animation_state->current_frame_rec,
+                 (Vector2){.x = player_state->player->x - 75,
+                           .y = player_state->player->y - 32},
+                 WHITE);
+}
+
+void InitAnimationStates(AnimationState animation_states[]) {
+
+  animation_states[IDLE] = (AnimationState){
+      .mode = IDLE,
+      .time_needed = .5,
+      .time_passed = 0,
+      .sprite = (SpriteSheetState){.sheet = LoadTexture(
+                                       "resources/hero/hero-idle.png"),
+                                   .rows = 1,
+                                   .cols = 2},
+      .frame_count = 2,
+      .current_frame_no = 0,
+      .current_frame_rec = (Rectangle){
+          .x = 0, .y = 192 / 2.0, .width = 192, .height = 192 / 2.0}};
+
+  animation_states[RUN] = (AnimationState){
+      .mode = RUN,
+      .time_needed = 0.08,
+      .time_passed = 0,
+      .sprite = (SpriteSheetState){.sheet = LoadTexture(
+                                       "resources/hero/hero-run.png"),
+                                   .rows = 1,
+                                   .cols = 8},
+      .frame_count = 8,
+      .current_frame_no = 0,
+      .current_frame_rec = (Rectangle){
+          .x = 0, .y = 192 / 2.0, .width = 192, .height = 192 / 2.0}};
+
+  animation_states[RUN_BACK] = (AnimationState){
+      .mode = RUN,
+      .time_needed = 0.08,
+      .time_passed = 0,
+      .sprite = (SpriteSheetState){.sheet = LoadTexture(
+                                       "resources/hero/hero-run-back.png"),
+                                   .rows = 1,
+                                   .cols = 8},
+      .frame_count = 8,
+      .current_frame_no = 0,
+      .current_frame_rec = (Rectangle){
+          .x = 0, .y = 192 / 2.0, .width = 192, .height = 192 / 2.0}};
+
+  animation_states[JUMP] = (AnimationState){
+      .mode = JUMP,
+      .time_needed = 0.08,
+      .time_passed = 0,
+      .sprite = (SpriteSheetState){.sheet = LoadTexture(
+                                       "resources/hero/hero-jump.png"),
+                                   .rows = 1,
+                                   .cols = 3},
+      .frame_count = 3,
+      .current_frame_no = 0,
+      .current_frame_rec = (Rectangle){
+          .x = 0, .y = 192 / 2.0, .width = 192, .height = 192 / 2.0}};
+}
+
+// void HandleJump(AnimationState* jump_animation, PlayerState* player_state,
+// PlayerMode* mode){
+
+// }
 
 int main() {
 
@@ -291,8 +579,13 @@ int main() {
                                         .height = 40 * tileset.tile_height};
 
   Rectangle player = (Rectangle){.x = 0, .y = 0, .width = 32, .height = 64};
-  PlayerState player_state =
-      (PlayerState){.player = &player, .speed = 10, .acceleration = 0.0};
+  PlayerState player_state = (PlayerState){.player = &player,
+                                           .speed = 5,
+                                           .falling_speed = 0,
+                                           .gravity = 9.8,
+                                           .jump_count = 2,
+                                           .jump_time_needed = 0.1,
+                                           .jump_time_passed = 0};
 
   Camera2D camera = (Camera2D){
       .offset =
@@ -300,13 +593,19 @@ int main() {
       .target =
           (Vector2){.x = player_state.player->x, .y = player_state.player->y},
       .rotation = 0.0,
-      .zoom = 1.7};
+      .zoom = 1.5};
+
+  PlayerMode current_mode = IDLE;
+
+  AnimationState animation_states[4];
+
+  InitAnimationStates(animation_states);
 
   SetTargetFPS(window.fps);
 
   while (!WindowShouldClose()) {
 
-    Update(&player_state, &camera, &tilemap);
+    Update(&player_state, &camera, &tilemap, &current_mode);
 
     BeginDrawing();
 
@@ -317,8 +616,26 @@ int main() {
     }
 
     ClearBackground(RAYWHITE);
-    DrawPlatform(&window, &platform, &tilemap);
+    DrawPlatform(&window, &platform, &tilemap, &player_state);
     DrawRectangleRec(player, RED);
+
+    switch (current_mode) {
+    case IDLE: {
+      AnimatePlayer(&animation_states[IDLE], &player_state);
+      break;
+    };
+    case RUN: {
+      AnimatePlayer(&animation_states[RUN], &player_state);
+      break;
+    }
+    case RUN_BACK: {
+      AnimatePlayer(&animation_states[RUN_BACK], &player_state);
+      break;
+    }
+      // case JUMP:{
+      //     HandleJump(&animation_states[JUMP], &player_state, &current_mode);
+      // }
+    }
 
     EndMode2D();
     EndDrawing();
