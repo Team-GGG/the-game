@@ -719,6 +719,8 @@ int main() {
       player_state.in_jump = true;
       player_state.air_time_passed = 0;
       player_state.rising_speed = 5;
+
+      player_state.jump_left--;
     }
 
     if (player_state.in_jump) {
