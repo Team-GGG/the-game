@@ -50,6 +50,8 @@ typedef struct {
   bool is_grounded;
   bool in_jump;
 
+  bool last_direction;
+
 } PlayerState;
 
 typedef struct {
@@ -60,7 +62,7 @@ typedef struct {
 
 } SpriteSheetState;
 
-typedef enum { IDLE, RUN, RUN_BACK, JUMP } PlayerMode;
+typedef enum { IDLE, IDLE_LEFT,RUN, RUN_LEFT, JUMP, JUMP_LEFT } PlayerMode;
 
 typedef struct {
 
@@ -140,8 +142,8 @@ bool CollisionResponse(TileInformation *tile_info, PlayerState *player_state,
     // down);
 
     int buffer = 15;
-    int x_push_back = 1;
-    int y_push_back = 1;
+    float x_push_back = 0.1;
+    float y_push_back = 0.1;
 
     if (up && down) {
 
@@ -449,17 +451,31 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
 
   if (player_state->is_grounded && IsKeyDown(KEY_LEFT)) {
     player_state->player->x -= player_state->speed;
-    *mode = RUN_BACK;
+    player_state->last_direction = 0;
+    *mode = RUN_LEFT;
   }
 
   else if (player_state->is_grounded && IsKeyDown(KEY_RIGHT)) {
     player_state->player->x += player_state->speed;
+    player_state->last_direction = 1;
     *mode = RUN;
   }
 
   else {
-    *mode = IDLE;
+    *mode = player_state->last_direction ? (IDLE) : (IDLE_LEFT);
   }
+
+
+  if(!player_state -> is_grounded && IsKeyDown(KEY_DOWN)){
+      player_state -> gravity *= 1.5;
+  }
+
+  else{
+      player_state -> gravity = 1.5;
+  }
+
+
+
 
   if (IsKeyPressed(KEY_P)) {
     (camera->zoom + 0.1 <= 2) ? (camera->zoom += 0.1) : (camera->zoom);
@@ -539,11 +555,24 @@ void AnimatePlayer(AnimationState *animation_state, PlayerState *player_state) {
       animation_state->current_frame_no *
       animation_state->current_frame_rec.width;
 
-  DrawTextureRec(animation_state->sprite.sheet,
-                 animation_state->current_frame_rec,
-                 (Vector2){.x = player_state->player->x - 75,
-                           .y = player_state->player->y - 32},
-                 WHITE);
+  if(player_state -> last_direction){
+
+      DrawTextureRec(animation_state->sprite.sheet,
+                     animation_state->current_frame_rec,
+                     (Vector2){.x = player_state->player->x - 75,
+                               .y = player_state->player->y - 32},
+                     WHITE);
+  }
+
+  else{
+
+      DrawTextureRec(animation_state->sprite.sheet,
+                     animation_state->current_frame_rec,
+                     (Vector2){.x = player_state->player->x - 82,
+                               .y = player_state->player->y - 32},
+                     WHITE);
+  }
+
 }
 
 void InitAnimationStates(AnimationState animation_states[]) {
@@ -554,6 +583,19 @@ void InitAnimationStates(AnimationState animation_states[]) {
       .time_passed = 0,
       .sprite = (SpriteSheetState){.sheet = LoadTexture(
                                        "resources/hero/hero-idle.png"),
+                                   .rows = 1,
+                                   .cols = 2},
+      .frame_count = 2,
+      .current_frame_no = 0,
+      .current_frame_rec = (Rectangle){
+          .x = 0, .y = 192 / 2.0, .width = 192, .height = 192 / 2.0}};
+
+  animation_states[IDLE_LEFT] = (AnimationState){
+      .mode = IDLE_LEFT,
+      .time_needed = .5,
+      .time_passed = 0,
+      .sprite = (SpriteSheetState){.sheet = LoadTexture(
+                                       "resources/hero/hero-idle-left.png"),
                                    .rows = 1,
                                    .cols = 2},
       .frame_count = 2,
@@ -574,7 +616,7 @@ void InitAnimationStates(AnimationState animation_states[]) {
       .current_frame_rec = (Rectangle){
           .x = 0, .y = 192 / 2.0, .width = 192, .height = 192 / 2.0}};
 
-  animation_states[RUN_BACK] = (AnimationState){
+  animation_states[RUN_LEFT] = (AnimationState){
       .mode = RUN,
       .time_needed = 0.08,
       .time_passed = 0,
@@ -599,28 +641,55 @@ void InitAnimationStates(AnimationState animation_states[]) {
       .current_frame_no = 0,
       .current_frame_rec = (Rectangle){
           .x = 0, .y = 192 / 2.0, .width = 192, .height = 192 / 2.0}};
+
+
+  animation_states[JUMP_LEFT] = (AnimationState){
+      .mode = JUMP_LEFT,
+      .time_needed = 0.08,
+      .time_passed = 0,
+      .sprite = (SpriteSheetState){.sheet = LoadTexture(
+                                       "resources/hero/hero-jump-left.png"),
+                                   .rows = 1,
+                                   .cols = 3},
+      .frame_count = 3,
+      .current_frame_no = 0,
+      .current_frame_rec = (Rectangle){
+          .x = 0, .y = 192 / 2.0, .width = 192, .height = 192 / 2.0}};
 }
 
 void DrawJumpState(AnimationState animation_states[], int frame_no,
                    PlayerState *player_state) {
 
-  animation_states[JUMP].current_frame_no = frame_no;
 
-  animation_states[JUMP].current_frame_rec.x =
-      animation_states[JUMP].current_frame_no *
-      animation_states[JUMP].current_frame_rec.width;
+  if(player_state -> last_direction){
+      animation_states[JUMP].current_frame_no = frame_no;
 
-  DrawTextureRec(animation_states[JUMP].sprite.sheet,
-                 animation_states[JUMP].current_frame_rec,
-                 (Vector2){.x = player_state->player->x - 75,
-                           .y = player_state->player->y - 32},
-                 WHITE);
+      animation_states[JUMP].current_frame_rec.x =
+          animation_states[JUMP].current_frame_no *
+          animation_states[JUMP].current_frame_rec.width;
+
+      DrawTextureRec(animation_states[JUMP].sprite.sheet,
+                     animation_states[JUMP].current_frame_rec,
+                     (Vector2){.x = player_state->player->x - 75,
+                               .y = player_state->player->y - 32},
+                     WHITE);
+  }
+  else{
+      animation_states[JUMP_LEFT].current_frame_no = frame_no;
+
+      animation_states[JUMP_LEFT].current_frame_rec.x =
+          animation_states[JUMP_LEFT].current_frame_no *
+          animation_states[JUMP_LEFT].current_frame_rec.width;
+
+      DrawTextureRec(animation_states[JUMP_LEFT].sprite.sheet,
+                     animation_states[JUMP_LEFT].current_frame_rec,
+                     (Vector2){.x = player_state->player->x - 75,
+                               .y = player_state->player->y - 32},
+                     WHITE);
+  }
+
 }
 
-// void HandleJump(AnimationState* jump_animation, PlayerState* player_state,
-// PlayerMode* mode){
-
-// }
 
 void HandleJump(AnimationState animation_states[], PlayerState *player_state) {
 
@@ -640,10 +709,12 @@ void HandleJump(AnimationState animation_states[], PlayerState *player_state) {
 
   if (IsKeyDown(KEY_LEFT)) {
     player_state->player->x -= player_state->speed;
+    player_state -> last_direction = 0;
   }
 
   else if (IsKeyDown(KEY_RIGHT)) {
     player_state->player->x += player_state->speed;
+    player_state -> last_direction  = 1;
   }
 }
 
@@ -677,7 +748,8 @@ int main() {
                                            .is_grounded = false,
                                            .in_jump = false,
                                            .rising_speed = 7,
-                                           .terminal_velocity = 10
+                                           .terminal_velocity = 10,
+                                           .last_direction = 1
 
   };
 
@@ -691,7 +763,7 @@ int main() {
 
   PlayerMode current_mode = IDLE;
 
-  AnimationState animation_states[4];
+  AnimationState animation_states[6];
 
   InitAnimationStates(animation_states);
 
@@ -735,12 +807,16 @@ int main() {
         AnimatePlayer(&animation_states[IDLE], &player_state);
         break;
       };
+      case IDLE_LEFT: {
+        AnimatePlayer(&animation_states[IDLE_LEFT], &player_state);
+        break;
+      };
       case RUN: {
         AnimatePlayer(&animation_states[RUN], &player_state);
         break;
       }
-      case RUN_BACK: {
-        AnimatePlayer(&animation_states[RUN_BACK], &player_state);
+      case RUN_LEFT: {
+        AnimatePlayer(&animation_states[RUN_LEFT], &player_state);
         break;
       }
       }
@@ -762,10 +838,12 @@ int main() {
 
       if (IsKeyDown(KEY_LEFT)) {
         player_state.player->x -= player_state.speed;
+        player_state.last_direction = 0;
       }
 
       else if (IsKeyDown(KEY_RIGHT)) {
         player_state.player->x += player_state.speed;
+        player_state.last_direction = 1;
       }
 
       DrawJumpState(animation_states, 1, &player_state);
