@@ -1,7 +1,8 @@
-#include <math.h>
 #include <raylib.h>
 #include <stdbool.h>
 #include <stdio.h>
+
+typedef enum { MAIN_MENU, GAME_MENU, DEATH_MENU } Menus;
 
 typedef struct {
 
@@ -719,6 +720,7 @@ void HandleJump(AnimationState animation_states[], PlayerState *player_state) {
 }
 
 int main() {
+  Menus menu = MAIN_MENU;
 
   WindowState window = (WindowState){.width = 1600, .height = 896, .fps = 60};
   PlatformState platform = (PlatformState){.tile_width = 32, .tile_height = 32};
@@ -738,7 +740,7 @@ int main() {
                                         .width = 50 * tileset.tile_width,
                                         .height = 40 * tileset.tile_height};
 
-  Rectangle player = (Rectangle){.x = 0, .y = 0, .width = 32, .height = 64};
+  Rectangle player = (Rectangle){.x = 0, .y = 1000, .width = 32, .height = 64};
   PlayerState player_state = (PlayerState){.player = &player,
                                            .speed = 5,
                                            .falling_speed = 0,
@@ -763,95 +765,171 @@ int main() {
 
   PlayerMode current_mode = IDLE;
 
-  AnimationState animation_states[6];
+  AnimationState animation_states[4];
 
   InitAnimationStates(animation_states);
 
+  InitAudioDevice();
+
+  Sound sound_walking = LoadSound("resources/Audio/running_in_grass.mp3");
   SetTargetFPS(window.fps);
 
   while (!WindowShouldClose()) {
+    if (menu == MAIN_MENU) {
+      //  Draw phase
+      BeginDrawing();
+      // Clean, dark minimalist background
+      // ClearBackground(GetColor(0x0f111aFF));
+      ClearBackground((Color){15, 17, 26, 128});
 
-    Update(&player_state, &camera, &tilemap, &current_mode);
+      // 1. DRAW THE TITLE ("HOLLOW")
+      const char titleText[] = "HOLLOW";
+      int titleFontSize = 80;
 
-    BeginDrawing();
+      // Calculate horizontal centering for the title
+      int titleWidth = MeasureText(titleText, titleFontSize);
+      int titleX = (window.width - titleWidth) / 2;
+      int titleY = GetScreenHeight() / 2.0 - 80; // Positioned in the upper half
 
-    BeginMode2D(camera);
+      // Draw the main title text
+      DrawText(titleText, titleX, titleY, titleFontSize, SKYBLUE);
 
-    if (IsKeyDown(KEY_A)) {
-      ToggleFullscreen();
-    }
+      // 2. DRAW THE SUBTITLE ("Press Enter to Play Game")
+      const char *subText = "Press Enter to Play Game";
+      int subFontSize = 24;
 
-    ClearBackground(RAYWHITE);
+      // Calculate horizontal centering for the subtitle
+      int subWidth = MeasureText(subText, subFontSize);
+      int subX = (window.width - subWidth) / 2;
+      int subY = titleY + 100; // Positioned in the lower half
 
-    DrawPlatform(&window, &platform, &tilemap, &player_state);
+      // Draw the subtitle text
+      DrawText(subText, subX, subY, subFontSize, LIGHTGRAY);
 
-    DrawRectangleRec(player, RED);
-
-    if (IsKeyPressed(KEY_SPACE) && player_state.jump_left > 0) {
-      player_state.in_jump = true;
-      player_state.air_time_passed = 0;
-      player_state.rising_speed = 5;
-
-      player_state.jump_left--;
-    }
-
-    if (player_state.in_jump) {
-      HandleJump(animation_states, &player_state);
-    }
-
-    else if (player_state.is_grounded) {
-
-
-      switch (current_mode) {
-      case IDLE: {
-        AnimatePlayer(&animation_states[IDLE], &player_state);
-        break;
-      };
-      case IDLE_LEFT: {
-        AnimatePlayer(&animation_states[IDLE_LEFT], &player_state);
-        break;
-      };
-      case RUN: {
-        AnimatePlayer(&animation_states[RUN], &player_state);
-        break;
-      }
-      case RUN_LEFT: {
-        AnimatePlayer(&animation_states[RUN_LEFT], &player_state);
-        break;
-      }
+      EndDrawing();
+      if (IsKeyPressed(KEY_ENTER)) {
+        menu = GAME_MENU;
       }
     }
+    if (menu == GAME_MENU) {
 
-    else {
+      Update(&player_state, &camera, &tilemap, &current_mode);
 
-      player_state.air_time_passed += GetFrameTime();
+      BeginDrawing();
 
-      player_state.falling_speed +=
-          (player_state.gravity * player_state.air_time_passed);
+      BeginMode2D(camera);
 
-      player_state.falling_speed =
-          (player_state.falling_speed <= player_state.terminal_velocity)
-              ? (player_state.falling_speed)
-              : (player_state.terminal_velocity);
-
-      player_state.player->y += player_state.falling_speed;
-
-      if (IsKeyDown(KEY_LEFT)) {
-        player_state.player->x -= player_state.speed;
-        player_state.last_direction = 0;
+      if (IsKeyDown(KEY_A)) {
+        ToggleFullscreen();
       }
 
-      else if (IsKeyDown(KEY_RIGHT)) {
-        player_state.player->x += player_state.speed;
-        player_state.last_direction = 1;
+      ClearBackground(RAYWHITE);
+
+      DrawPlatform(&window, &platform, &tilemap, &player_state);
+
+      DrawRectangleRec(player, RED);
+
+      if (IsKeyPressed(KEY_SPACE) && player_state.jump_left > 0) {
+        player_state.in_jump = true;
+        player_state.air_time_passed = 0;
+        player_state.rising_speed = 5;
+
+        player_state.jump_left--;
       }
 
-      DrawJumpState(animation_states, 1, &player_state);
+      if (player_state.in_jump) {
+        HandleJump(animation_states, &player_state);
+        StopSound(sound_walking); // Needed to stop sound for playing when
+                                  // player not grounded
+      }
+
+      else if (player_state.is_grounded) {
+        // Sound of Walking Code//
+        if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_LEFT)) {
+          if (IsSoundPlaying(sound_walking) == 0) {
+              SetSoundVolume(sound_walking, 1.0f);
+            PlaySound(sound_walking);
+          }
+        } else {
+          StopSound(sound_walking);
+        }
+        // Sound of Walking Code end//
+
+        switch (current_mode) {
+        case IDLE: {
+          AnimatePlayer(&animation_states[IDLE], &player_state);
+          break;
+        };
+        case RUN: {
+          AnimatePlayer(&animation_states[RUN], &player_state);
+          break;
+        }
+        case RUN_LEFT: {
+          AnimatePlayer(&animation_states[RUN_LEFT], &player_state);
+          break;
+        }
+        }
+      }
+
+      else {
+        StopSound(sound_walking); // Needed to stop sound for playing when
+                                  // player not grounded
+
+        player_state.air_time_passed += GetFrameTime();
+
+        player_state.falling_speed +=
+            (player_state.gravity * player_state.air_time_passed);
+
+        player_state.falling_speed =
+            (player_state.falling_speed <= player_state.terminal_velocity)
+                ? (player_state.falling_speed)
+                : (player_state.terminal_velocity);
+
+        player_state.player->y += player_state.falling_speed;
+
+        if (IsKeyDown(KEY_LEFT)) {
+          player_state.player->x -= player_state.speed;
+        }
+
+        else if (IsKeyDown(KEY_RIGHT)) {
+          player_state.player->x += player_state.speed;
+        }
+
+        DrawJumpState(animation_states, 1, &player_state);
+      }
+
+      EndMode2D();
+      EndDrawing();
+      if ((player_state.player->y) > 2000) {
+        menu = DEATH_MENU;
+      }
+      printf("%f \n", player_state.player->y);
     }
 
-    EndMode2D();
-    EndDrawing();
+    if (menu == DEATH_MENU) {
+      BeginDrawing();
+      ClearBackground(GetColor(0x590404FF));
+
+
+     const char* death_text = "Press Enter to Go Back To Main Menu" ;
+     int font_size = 50;
+
+      DrawText(death_text, (GetScreenWidth() - MeasureText(death_text, font_size )) / 2.0, GetScreenHeight()/2.0 - font_size, font_size, LIGHTGRAY);
+
+      EndDrawing();
+      if (IsKeyPressed(KEY_ENTER)) {
+        menu = MAIN_MENU;
+        player_state.player->y =
+            1000; // not resetting y causes insta death because player is still
+                  // below falling level; see below comment;
+        player_state.player->x =
+            0; // Need to reset all other (x,speed etc) too , but I think it
+               // will be better to write a deathfunction and handle this using
+               // that instead of everything else
+      }
+    }
   }
-
+  UnloadSound(sound_walking);
+  CloseAudioDevice();
   UnloadTexture(tileset_texture);
 }
