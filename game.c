@@ -63,7 +63,7 @@ typedef struct {
 
 } SpriteSheetState;
 
-typedef enum { IDLE, IDLE_LEFT,RUN, RUN_LEFT, JUMP, JUMP_LEFT } PlayerMode;
+typedef enum { IDLE, IDLE_LEFT, RUN, RUN_LEFT, JUMP, JUMP_LEFT } PlayerMode;
 
 typedef struct {
 
@@ -89,6 +89,28 @@ typedef struct {
   Rectangle *rec;
 
 } TileInformation;
+
+typedef enum {
+
+  VERTICAL,
+  HORIZONTAL
+
+} FloaterType;
+
+typedef struct {
+
+  FloaterType type;
+  int *floater;
+  int floater_width;
+  Vector2 position;
+  float speed;
+
+  Vector2 upper_bound;
+  Vector2 lower_bound;
+
+  bool direction;
+
+} Floater;
 
 void ResetPlayerAirState(PlayerState *player_state) {
   player_state->is_grounded = true;
@@ -272,126 +294,174 @@ bool CollisionResponse(TileInformation *tile_info, PlayerState *player_state,
   return (!X && !Y);
 }
 
+Vector2 TileResolveFromSerial(int tile_offset, TilemapState *tilemap) {
+
+  bool is_divisible = (tile_offset % tilemap->tileset->cols) && 1;
+
+  int in_x_dir;
+  int in_y_dir;
+
+  if (is_divisible) {
+    in_x_dir = (tile_offset % tilemap->tileset->cols - 1);
+    in_y_dir = (tile_offset / tilemap->tileset->cols);
+  }
+
+  else {
+    in_x_dir = tilemap->tileset->cols - 1;
+    in_y_dir = (tile_offset / tilemap->tileset->cols) - 1;
+  }
+
+  return (Vector2){.x = in_x_dir * tilemap->tileset->tile_width,
+                   .y = in_y_dir * tilemap->tileset->tile_height};
+}
+
+bool FloaterCollisionResponse(Floater *floater, PlayerState *player_state) {
+
+  int buffer = 15;
+  bool is_grounded = false;
+  float x_push_back = 0.1;
+  float y_push_back = 0.1;
+
+  for (int i = 0; i < floater->floater_width; i++) {
+
+    bool X = (floater->position.x + (i + 1) * 32 < player_state->player->x) ||
+             (player_state->player->x + player_state->player->width <
+              (floater->position.x + i * 32));
+
+    bool Y = (floater->position.y + 32 < player_state->player->y) ||
+             (player_state->player->y + player_state->player->height <
+              (floater->position.y));
+
+    if (!X && !Y) {
+
+      if (i == 0) {
+
+        if ((player_state->player->y + player_state->player->height) <=
+            (floater->position.y + buffer)) {
+          player_state->player->y = floater->position.y -
+                                    player_state->player->height +
+                                    floater->speed + y_push_back;
+
+          if (!(player_state->is_grounded)) {
+            ResetPlayerAirState(player_state);
+          }
+
+          is_grounded |= true;
+        }
+
+        else if ((player_state->player->y) >=
+                 (floater->position.y + 32 - buffer)) {
+          player_state->player->y = floater->position.y + 32 + y_push_back;
+
+        }
+
+        else {
+          player_state->player->x =
+              floater->position.x - player_state->player->width - x_push_back;
+        }
+      }
+
+      else if (i == floater->floater_width - 1) {
+
+        if ((player_state->player->y + player_state->player->height) <=
+            (floater->position.y + buffer)) {
+          player_state->player->y = floater->position.y -
+                                    player_state->player->height +
+                                    floater->speed + y_push_back;
+
+          if (!(player_state->is_grounded)) {
+            ResetPlayerAirState(player_state);
+          }
+
+          is_grounded |= true;
+        }
+
+        else if ((player_state->player->y) >=
+                 (floater->position.y + 32 - buffer)) {
+          player_state->player->y = floater->position.y + 32 + y_push_back;
+
+        }
+
+        else {
+          player_state->player->x =
+              floater->position.x + (i + 1) * 32 + x_push_back;
+        }
+      }
+
+      else {
+
+        if (player_state->player->y <= floater->position.y + buffer) {
+
+          player_state->player->y = floater->position.y -
+                                    player_state->player->height +
+                                    floater->speed + y_push_back;
+
+          if (player_state->is_grounded == false) {
+            ResetPlayerAirState(player_state);
+          }
+
+          is_grounded |= true;
+        }
+
+        else {
+          player_state->player->y = floater->position.y + 32 + y_push_back;
+        }
+      }
+    }
+  }
+
+  return is_grounded;
+}
+
 void DrawPlatform(WindowState *window, PlatformState *platform,
-                  TilemapState *tilemap, PlayerState *player_state) {
+                  TilemapState *tilemap, PlayerState *player_state,
+                  Floater floaters[]) {
 
   const int cols = tilemap->width / platform->tile_width;
   const int rows = tilemap->height / platform->tile_height;
   const int data_size = (cols) * (rows);
 
   const short data[] = {
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  6,  7,  7,  8,  0,  0,  0,  0,  0,  6,
-      7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  8,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  6,  7,  7,  7,  7,  7,
-      7,  7,  7,  7,  7,  7,  7,  7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      6,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  6,  7,
-      7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  8,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  6,  7,  7,  7,  7,  8,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  43, 2,  2,  2,  2,  2,  3,  0,  0,  0,  0,
-      0,  71, 11, 10, 10, 12, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  43, 55, 24, 37, 37, 37, 37, 66, 0,  0,  0,  0,  0,  65, 4,  4,
-      4,  62, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  34, 11, 33, 2,  34, 10, 11, 33, 2,  2,  2,  2,  55, 37,
-      24, 24, 15, 14, 37, 64, 0,  0,  0,  0,  0,  65, 4,  4,  37, 62, 0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      40, 4,  4,  15, 4,  4,  4,  4,  14, 14, 14, 15, 15, 24, 37, 14, 4,  4,
-      14, 62, 0,  0,  0,  0,  0,  65, 4,  4,  4,  35, 33, 34, 10, 10, 33, 2,
-      2,  34, 10, 33, 2,  2,  3,  0,  0,  0,  0,  0,  0,  0,  4,  4,  4,  4,
-      4,  39, 4,  4,  4,  4,  4,  4,  4,  14, 15, 4,  4,  4,  4,  62, 0,  0,
-      0,  0,  0,  53, 4,  4,  4,  4,  4,  4,  4,  4,  4,  14, 15, 4,  4,  4,
-      14, 15, 66, 0,  0,  0,  0,  0,  0,  0,  4,  4,  4,  4,  4,  4,  4,  4,
-      4,  4,  4,  4,  4,  4,  4,  4,  4,  40, 4,  62, 0,  0,  0,  0,  0,  61,
-      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  64, 0,
-      0,  0,  0,  0,  0,  0,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  40, 4,
-      4,  4,  4,  4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  4,
-      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  35, 10, 10, 11, 11, 11,
-      10, 10};
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 7, 8, 0, 0, 0, 0, 0, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 7, 7, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 3, 0, 0, 0, 0, 0, 71, 11, 10, 10, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65, 24, 37, 37, 37, 37, 66, 0, 0, 0, 0, 0, 65, 4, 4, 4, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  34, 11, 33, 2, 34, 10, 11, 33, 2, 2, 2, 2, 34, 37, 24, 24, 15, 14, 37, 64, 0, 0, 0, 0, 0, 65, 4, 4, 37, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                  40, 4, 4, 15, 4, 4, 4, 4, 14, 14, 14, 15, 4, 15, 37, 14, 4, 4, 14, 62, 0, 0, 0, 0, 0, 65, 4, 4, 4, 35, 33, 34, 10, 10, 33, 2, 2, 34, 10, 33, 2, 2, 3, 0, 0, 0, 0, 0, 0, 0,
+                  4, 4, 4, 4, 4, 39, 4, 4, 4, 4, 4, 4, 4, 4, 15, 4, 4, 4, 4, 62, 0, 0, 0, 0, 0, 53, 4, 4, 4, 4, 4, 4, 4, 4, 4, 14, 15, 4, 4, 4, 14, 15, 66, 0, 0, 0, 0, 0, 0, 0,
+                  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 40, 4, 62, 0, 0, 0, 0, 0, 61, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 64, 0, 0, 0, 0, 0, 0, 0,
+                  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 40, 4, 4, 4, 4, 4, 4, 4, 4, 62, 0, 0, 0, 0, 0, 61, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 35, 10, 10, 11, 11, 11, 10, 10};
 
   Rectangle current_tile =
       (Rectangle){.x = 0, .y = 0, .width = 32, .height = 32};
@@ -407,26 +477,13 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
         continue;
       }
 
-      bool is_divisible = (tile_offset % tilemap->tileset->cols) && 1;
-
-      int in_x_dir;
-      int in_y_dir;
-
-      if (is_divisible) {
-        in_x_dir = (tile_offset % tilemap->tileset->cols - 1);
-        in_y_dir = (tile_offset / tilemap->tileset->cols);
-      }
-
-      else {
-        in_x_dir = tilemap->tileset->cols - 1;
-        in_y_dir = (tile_offset / tilemap->tileset->cols) - 1;
-      }
-
-      current_tile.x = in_x_dir * tilemap->tileset->tile_width;
-      current_tile.y = in_y_dir * tilemap->tileset->tile_height;
-
       Rectangle current_tile_rec =
           (Rectangle){.x = j * 32, .y = i * 32, .width = 32, .height = 32};
+
+      Vector2 tile = TileResolveFromSerial(tile_offset, tilemap);
+
+      current_tile.x = tile.x;
+      current_tile.y = tile.y;
 
       TileInformation tile_info = (TileInformation){
           .i = i, .j = j, .rows = rows, .cols = cols, .rec = &current_tile_rec};
@@ -442,9 +499,28 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
       DrawTextureRec(*(tilemap->tileset->texture), current_tile,
                      (Vector2){.x = j * 32, .y = i * 32}, WHITE);
     }
+
+    for (int idx = 0; idx < 3; idx++) {
+      for (int i = 0; i < floaters[idx].floater_width; i++) {
+
+        Vector2 position = (Vector2){.x = floaters[idx].position.x + i * 32,
+                                     .y = floaters[idx].position.y};
+
+        Vector2 tile = TileResolveFromSerial(floaters[idx].floater[i], tilemap);
+        current_tile.x = tile.x;
+        current_tile.y = tile.y;
+
+        DrawTextureRec(*(tilemap->tileset->texture), current_tile, position,
+                       WHITE);
+      }
+
+      is_grounded |= FloaterCollisionResponse(&floaters[idx], player_state);
+    }
   }
 
   player_state->is_grounded = is_grounded;
+
+  printf("is_grounded: %d\n", is_grounded);
 }
 
 void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
@@ -466,17 +542,13 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
     *mode = player_state->last_direction ? (IDLE) : (IDLE_LEFT);
   }
 
-
-  if(!player_state -> is_grounded && IsKeyDown(KEY_DOWN)){
-      player_state -> gravity *= 1.5;
+  if (!player_state->is_grounded && IsKeyDown(KEY_DOWN)) {
+    player_state->gravity *= 1.5;
   }
 
-  else{
-      player_state -> gravity = 1.5;
+  else {
+    player_state->gravity = 1.5;
   }
-
-
-
 
   if (IsKeyPressed(KEY_P)) {
     (camera->zoom + 0.1 <= 2) ? (camera->zoom += 0.1) : (camera->zoom);
@@ -491,8 +563,8 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
   }
 
   if (player_state->player->x >
-      (tilemap->width - player_state->player->width)) {
-    player_state->player->x = tilemap->width - player_state->player->width;
+      (tilemap->width - player_state->player->width + 15)) {
+    player_state->player->x = tilemap->width - player_state->player->width + 15;
   }
 
   if (player_state->player->y < 0) {
@@ -556,24 +628,23 @@ void AnimatePlayer(AnimationState *animation_state, PlayerState *player_state) {
       animation_state->current_frame_no *
       animation_state->current_frame_rec.width;
 
-  if(player_state -> last_direction){
+  if (player_state->last_direction) {
 
-      DrawTextureRec(animation_state->sprite.sheet,
-                     animation_state->current_frame_rec,
-                     (Vector2){.x = player_state->player->x - 75,
-                               .y = player_state->player->y - 32},
-                     WHITE);
+    DrawTextureRec(animation_state->sprite.sheet,
+                   animation_state->current_frame_rec,
+                   (Vector2){.x = player_state->player->x - 75,
+                             .y = player_state->player->y - 32},
+                   WHITE);
   }
 
-  else{
+  else {
 
-      DrawTextureRec(animation_state->sprite.sheet,
-                     animation_state->current_frame_rec,
-                     (Vector2){.x = player_state->player->x - 82,
-                               .y = player_state->player->y - 32},
-                     WHITE);
+    DrawTextureRec(animation_state->sprite.sheet,
+                   animation_state->current_frame_rec,
+                   (Vector2){.x = player_state->player->x - 82,
+                             .y = player_state->player->y - 32},
+                   WHITE);
   }
-
 }
 
 void InitAnimationStates(AnimationState animation_states[]) {
@@ -643,7 +714,6 @@ void InitAnimationStates(AnimationState animation_states[]) {
       .current_frame_rec = (Rectangle){
           .x = 0, .y = 192 / 2.0, .width = 192, .height = 192 / 2.0}};
 
-
   animation_states[JUMP_LEFT] = (AnimationState){
       .mode = JUMP_LEFT,
       .time_needed = 0.08,
@@ -661,36 +731,32 @@ void InitAnimationStates(AnimationState animation_states[]) {
 void DrawJumpState(AnimationState animation_states[], int frame_no,
                    PlayerState *player_state) {
 
+  if (player_state->last_direction) {
+    animation_states[JUMP].current_frame_no = frame_no;
 
-  if(player_state -> last_direction){
-      animation_states[JUMP].current_frame_no = frame_no;
+    animation_states[JUMP].current_frame_rec.x =
+        animation_states[JUMP].current_frame_no *
+        animation_states[JUMP].current_frame_rec.width;
 
-      animation_states[JUMP].current_frame_rec.x =
-          animation_states[JUMP].current_frame_no *
-          animation_states[JUMP].current_frame_rec.width;
+    DrawTextureRec(animation_states[JUMP].sprite.sheet,
+                   animation_states[JUMP].current_frame_rec,
+                   (Vector2){.x = player_state->player->x - 75,
+                             .y = player_state->player->y - 32},
+                   WHITE);
+  } else {
+    animation_states[JUMP_LEFT].current_frame_no = frame_no;
 
-      DrawTextureRec(animation_states[JUMP].sprite.sheet,
-                     animation_states[JUMP].current_frame_rec,
-                     (Vector2){.x = player_state->player->x - 75,
-                               .y = player_state->player->y - 32},
-                     WHITE);
+    animation_states[JUMP_LEFT].current_frame_rec.x =
+        animation_states[JUMP_LEFT].current_frame_no *
+        animation_states[JUMP_LEFT].current_frame_rec.width;
+
+    DrawTextureRec(animation_states[JUMP_LEFT].sprite.sheet,
+                   animation_states[JUMP_LEFT].current_frame_rec,
+                   (Vector2){.x = player_state->player->x - 75,
+                             .y = player_state->player->y - 32},
+                   WHITE);
   }
-  else{
-      animation_states[JUMP_LEFT].current_frame_no = frame_no;
-
-      animation_states[JUMP_LEFT].current_frame_rec.x =
-          animation_states[JUMP_LEFT].current_frame_no *
-          animation_states[JUMP_LEFT].current_frame_rec.width;
-
-      DrawTextureRec(animation_states[JUMP_LEFT].sprite.sheet,
-                     animation_states[JUMP_LEFT].current_frame_rec,
-                     (Vector2){.x = player_state->player->x - 75,
-                               .y = player_state->player->y - 32},
-                     WHITE);
-  }
-
 }
-
 
 void HandleJump(AnimationState animation_states[], PlayerState *player_state) {
 
@@ -710,12 +776,53 @@ void HandleJump(AnimationState animation_states[], PlayerState *player_state) {
 
   if (IsKeyDown(KEY_LEFT)) {
     player_state->player->x -= player_state->speed;
-    player_state -> last_direction = 0;
+    player_state->last_direction = 0;
   }
 
   else if (IsKeyDown(KEY_RIGHT)) {
     player_state->player->x += player_state->speed;
-    player_state -> last_direction  = 1;
+    player_state->last_direction = 1;
+  }
+}
+
+void HandleHorizontalFloater(PlayerState *player_state, Floater *floater) {
+    if(FloaterCollisionResponse(floater, player_state)){
+        player_state -> player -> x -= floater->speed * ((floater -> direction) ? (-1) : (1));
+    };
+}
+
+void UpdateFloaters(Floater floaters[], PlayerState* player_state) {
+  for (int i = 0; i < 3; i++) {
+
+    if (floaters[i].type == VERTICAL) {
+
+      if (floaters[i].position.y <= floaters[i].upper_bound.y) {
+        floaters[i].direction = 0;
+      }
+
+      if (floaters[i].position.y >= floaters[i].lower_bound.y) {
+        floaters[i].direction = 1;
+      }
+
+      floaters[i].position.y +=
+          (floaters[i].direction ? (-1) : (1)) * floaters[i].speed;
+
+    }
+
+    else {
+      if (floaters[i].position.x <= floaters[i].lower_bound.x) {
+        floaters[i].direction = 1;
+      }
+
+      if (floaters[i].position.x >= floaters[i].upper_bound.x) {
+        floaters[i].direction = 0;
+      }
+
+      floaters[i].position.x +=
+          (floaters[i].direction ? (1) : (-1)) * floaters[i].speed;
+
+     HandleHorizontalFloater(player_state, &floaters[i]);
+    }
   }
 }
 
@@ -742,7 +849,7 @@ int main() {
 
   Rectangle player = (Rectangle){.x = 0, .y = 1000, .width = 32, .height = 64};
   PlayerState player_state = (PlayerState){.player = &player,
-                                           .speed = 5,
+                                           .speed = 5.7,
                                            .falling_speed = 0,
                                            .gravity = 1.5,
                                            .jump_left = 0,
@@ -763,9 +870,56 @@ int main() {
       .rotation = 0.0,
       .zoom = 1.5};
 
+  Floater floaters[3];
+
+  floaters[0] = (Floater){
+      .floater = (int[]){44, 45, 45, 46},
+      .floater_width = 4,
+      .speed = 0.7,
+      .position = (Vector2){.x = 45 * tileset.tile_width,
+                            .y = 34 * tileset.tile_height},
+      .type = VERTICAL,
+      .lower_bound = (Vector2){.x = 45 * tileset.tile_width,
+                               .y = 34 * tileset.tile_height},
+      .upper_bound = (Vector2){.x = 45 * tileset.tile_width,
+                               .y = 25 * tileset.tile_height},
+      .direction = 1,
+
+  };
+
+  floaters[1] =
+      (Floater){.floater = (int[]){44, 45, 46},
+                .floater_width = 3,
+                .speed = 0.7,
+                .position = (Vector2){.x = 31 * tileset.tile_width,
+                                      .y = 25 * tileset.tile_height},
+                .type = HORIZONTAL,
+                .upper_bound = (Vector2){.x = 31 * tileset.tile_width,
+                                         .y = 25 * tileset.tile_height},
+                .lower_bound = (Vector2){.x = 22 * tileset.tile_width,
+                                         .y = 25 * tileset.tile_height},
+                .direction = 0
+
+      };
+
+  floaters[2] = (Floater){.floater = (int[]){44, 45, 45, 46},
+                          .floater_width = 4,
+                          .speed = 0.7,
+                          .position = (Vector2){.x = 2 * tileset.tile_width,
+                                                .y = 25 * tileset.tile_height},
+                          .type = VERTICAL,
+                          .upper_bound = (Vector2){.x = 2 * tileset.tile_width,
+                                                .y = 9 * tileset.tile_height},
+                          .lower_bound = (Vector2){.x = 2 * tileset.tile_width,
+                                                .y = 25 * tileset.tile_height},
+                          .direction = 1
+
+
+  };
+
   PlayerMode current_mode = IDLE;
 
-  AnimationState animation_states[4];
+  AnimationState animation_states[6];
 
   InitAnimationStates(animation_states);
 
@@ -814,6 +968,7 @@ int main() {
     if (menu == GAME_MENU) {
 
       Update(&player_state, &camera, &tilemap, &current_mode);
+      UpdateFloaters(floaters, &player_state);
 
       BeginDrawing();
 
@@ -825,7 +980,7 @@ int main() {
 
       ClearBackground(RAYWHITE);
 
-      DrawPlatform(&window, &platform, &tilemap, &player_state);
+      DrawPlatform(&window, &platform, &tilemap, &player_state, floaters);
 
       DrawRectangleRec(player, RED);
 
@@ -847,7 +1002,7 @@ int main() {
         // Sound of Walking Code//
         if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_LEFT)) {
           if (IsSoundPlaying(sound_walking) == 0) {
-              SetSoundVolume(sound_walking, 1.0f);
+            SetSoundVolume(sound_walking, 1.0f);
             PlaySound(sound_walking);
           }
         } else {
@@ -860,6 +1015,12 @@ int main() {
           AnimatePlayer(&animation_states[IDLE], &player_state);
           break;
         };
+
+        case IDLE_LEFT: {
+          AnimatePlayer(&animation_states[IDLE_LEFT], &player_state);
+          break;
+        };
+
         case RUN: {
           AnimatePlayer(&animation_states[RUN], &player_state);
           break;
@@ -903,18 +1064,19 @@ int main() {
       if ((player_state.player->y) > 2000) {
         menu = DEATH_MENU;
       }
-      printf("%f \n", player_state.player->y);
+      // printf("%f \n", player_state.player->y);
     }
 
     if (menu == DEATH_MENU) {
       BeginDrawing();
       ClearBackground(GetColor(0x590404FF));
 
+      const char *death_text = "Press Enter to Go Back To Main Menu";
+      int font_size = 50;
 
-     const char* death_text = "Press Enter to Go Back To Main Menu" ;
-     int font_size = 50;
-
-      DrawText(death_text, (GetScreenWidth() - MeasureText(death_text, font_size )) / 2.0, GetScreenHeight()/2.0 - font_size, font_size, LIGHTGRAY);
+      DrawText(death_text,
+               (GetScreenWidth() - MeasureText(death_text, font_size)) / 2.0,
+               GetScreenHeight() / 2.0 - font_size, font_size, LIGHTGRAY);
 
       EndDrawing();
       if (IsKeyPressed(KEY_ENTER)) {
