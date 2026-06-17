@@ -54,6 +54,8 @@ typedef struct {
 
   bool last_direction;
 
+  float hp;
+
 } PlayerState;
 
 typedef struct {
@@ -112,6 +114,29 @@ typedef struct {
   bool direction;
 
 } Floater;
+
+typedef struct {
+
+  int width;
+  int height;
+  float damage;
+  Vector2 position;
+  Vector2 lower_bound;
+  Vector2 upper_bound;
+  Rectangle hitbox;
+  Texture2D sprite_sheet;
+
+  int frame_count;
+  Rectangle current_frame_rec;
+  int current_frame_no;
+  float time_needed;
+  float time_passed;
+
+  float speed;
+  float max_speed;
+  bool direction;
+
+} Trap;
 
 void ResetPlayerAirState(PlayerState *player_state) {
   player_state->is_grounded = true;
@@ -210,7 +235,6 @@ bool CollisionResponse(TileInformation *tile_info, PlayerState *player_state,
         player_state->player->y =
             tile_info->rec->y - player_state->player->height + y_push_back;
 
-
       }
 
       else {
@@ -237,7 +261,6 @@ bool CollisionResponse(TileInformation *tile_info, PlayerState *player_state,
             tile_info->rec->x - player_state->player->width - x_push_back;
 
         player_state->player->y += player_state->sliding_speed;
-
       }
     }
 
@@ -260,7 +283,6 @@ bool CollisionResponse(TileInformation *tile_info, PlayerState *player_state,
       else {
         player_state->player->x =
             tile_info->rec->x - player_state->player->width - x_push_back;
-
 
         player_state->player->y += player_state->sliding_speed;
       }
@@ -285,7 +307,6 @@ bool CollisionResponse(TileInformation *tile_info, PlayerState *player_state,
       else {
         player_state->player->x =
             tile_info->rec->x + tile_info->rec->width + x_push_back;
-
 
         player_state->player->y += player_state->sliding_speed;
       }
@@ -343,7 +364,6 @@ bool FloaterCollisionResponse(Floater *floater, PlayerState *player_state) {
                                     player_state->player->height +
                                     floater->speed + y_push_back;
 
-
           is_grounded |= true;
         }
 
@@ -357,7 +377,6 @@ bool FloaterCollisionResponse(Floater *floater, PlayerState *player_state) {
           player_state->player->x =
               floater->position.x - player_state->player->width - x_push_back;
 
-
           player_state->player->y += player_state->sliding_speed;
         }
       }
@@ -369,7 +388,6 @@ bool FloaterCollisionResponse(Floater *floater, PlayerState *player_state) {
           player_state->player->y = floater->position.y -
                                     player_state->player->height +
                                     floater->speed + y_push_back;
-
 
           is_grounded |= true;
         }
@@ -384,7 +402,6 @@ bool FloaterCollisionResponse(Floater *floater, PlayerState *player_state) {
           player_state->player->x =
               floater->position.x + (i + 1) * 32 + x_push_back;
 
-
           player_state->player->y += player_state->sliding_speed;
         }
       }
@@ -396,7 +413,6 @@ bool FloaterCollisionResponse(Floater *floater, PlayerState *player_state) {
           player_state->player->y = floater->position.y -
                                     player_state->player->height +
                                     floater->speed + y_push_back;
-
 
           is_grounded |= true;
         }
@@ -532,10 +548,10 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
       4,  4,  4,  4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  4,
       4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  35, 10, 10, 11, 11, 11,
       10, 10, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  62, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  62, 0,  0,  0,  0,  0,  61, 0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  62,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  61, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0};
 
   Rectangle current_tile =
@@ -570,12 +586,10 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
 
       else {
         is_grounded |= CollisionResponse(&tile_info, player_state, data);
-
-
       }
 
-      if(is_grounded){
-          ResetPlayerAirState(player_state);
+      if (is_grounded) {
+        ResetPlayerAirState(player_state);
       }
 
       DrawTextureRec(*(tilemap->tileset->texture), current_tile,
@@ -598,16 +612,13 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
 
       is_grounded |= FloaterCollisionResponse(&floaters[idx], player_state);
     }
-
-
   }
 
   player_state->is_grounded = is_grounded;
 
-  if(is_grounded){
-      ResetPlayerAirState(player_state);
+  if (is_grounded) {
+    ResetPlayerAirState(player_state);
   }
-
 }
 
 void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
@@ -914,6 +925,94 @@ void UpdateFloaters(Floater floaters[], PlayerState *player_state) {
   }
 }
 
+void DrawTrap(Trap *trap) {
+
+  if (trap->time_needed >= trap->time_passed) {
+    trap->current_frame_no++;
+  }
+
+  if (trap->current_frame_no > trap->frame_count) {
+    trap->current_frame_no = 1;
+  }
+
+  trap->current_frame_rec.x =
+      trap->current_frame_no * trap->current_frame_rec.width;
+
+  DrawTextureRec(trap->sprite_sheet, trap->current_frame_rec, trap->position,
+                 WHITE);
+}
+
+bool SimpleCollisionCheck(Rectangle *rec1, Rectangle *rec2) {
+  bool X =
+      (rec1->x + rec1->width <= rec2->x) || (rec2->x + rec2->width <= rec1->x);
+  bool Y = (rec1->y + rec1->height <= rec2->y) ||
+           (rec2->y + rec2->height <= rec1->y);
+
+  if (!X && !Y) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+void UpdateTrap(Trap *trap, PlayerState *player_state) {
+
+  if (trap->direction) {
+    trap->speed =
+        (trap->max_speed) * ((trap->position.x) / (float)(trap->upper_bound.x));
+  } else {
+    trap->speed =
+        (trap->max_speed) * ((float)(trap->lower_bound.x) / (trap->position.x));
+  }
+
+  if (trap->position.x + trap->speed > trap->upper_bound.x) {
+    trap->direction = 0;
+  }
+
+  else if (trap->position.x + trap->speed < trap->lower_bound.x) {
+    trap->direction = 1;
+  }
+
+  trap->position.x += (trap->direction ? (1) : (-1)) * (trap->speed);
+  trap->hitbox.x = trap->position.x;
+
+  if (SimpleCollisionCheck(&trap->hitbox, player_state->player)) {
+    player_state->hp -= trap->damage;
+  };
+}
+
+void DrawHP(PlayerState *player_state) {
+
+  Rectangle back = (Rectangle){.width = 55,
+                               .height = 4,
+                               .x = player_state->player->x +
+                                    player_state->player->width / 2.0 - 27.5,
+                               .y = player_state->player->y - 15};
+
+  Rectangle hp_bar = (Rectangle){.width = back.width * player_state->hp,
+                                 .height = 4,
+                                 .x = back.x,
+                                 .y = player_state->player->y - 15};
+
+  Color color;
+
+  if (player_state->hp > 0.56) {
+    color = (Color){22, 196, 127, 255};
+  }
+
+  else if (player_state->hp <= 0.56 && player_state->hp >= 20.6) {
+    color = (Color){255, 214, 90, 255};
+  }
+
+  else {
+
+    color = (Color){249, 56, 39, 255};
+  }
+
+  DrawRectangleRounded(back, 1, 0, LIGHTGRAY);
+  DrawRectangleRounded(hp_bar, 1, 0, color);
+}
+
 int main() {
   Menus menu = MAIN_MENU;
 
@@ -947,7 +1046,8 @@ int main() {
                                            .rising_speed = 7,
                                            .sliding_speed = 2,
                                            .terminal_velocity = 10,
-                                           .last_direction = 1
+                                           .last_direction = 1,
+                                           .hp =.10
 
   };
 
@@ -1002,7 +1102,7 @@ int main() {
           (Vector2){.x = 2 * tileset.tile_width, .y = 9 * tileset.tile_height},
       .lower_bound =
           (Vector2){.x = 2 * tileset.tile_width, .y = 25 * tileset.tile_height},
-      .direction = 1
+      .direction = 0
 
   };
 
@@ -1017,6 +1117,38 @@ int main() {
 
   Sound sound_walking = LoadSound("resources/Audio/running_in_grass.mp3");
   SetTargetFPS(window.fps);
+
+  Trap trap = (Trap){
+
+      .width = 38,
+      .height = 38,
+      .damage = 1,
+      .position =
+          (Vector2){.x = 8 * tilemap.tileset->tile_width,
+                    .y = 25 * tilemap.tileset->tile_height - trap.height},
+      .hitbox = (Rectangle){.width = trap.width,
+                            .height = trap.height,
+                            .x = trap.position.x,
+                            .y = trap.position.y},
+      .sprite_sheet = LoadTexture("resources/traps/saw.png"),
+      .frame_count = 10,
+      .current_frame_no = 1,
+      .current_frame_rec =
+          (Rectangle){
+              .width = trap.width, .height = trap.height, .x = 0, .y = 0},
+      .time_needed = 0.05,
+      .time_passed = 0,
+      .lower_bound =
+          (Vector2){.x = 8 * tilemap.tileset->tile_width,
+                    .y = 25 * tilemap.tileset->tile_height - trap.height},
+      .upper_bound =
+          (Vector2){.x = 20 * tilemap.tileset->tile_width,
+                    .y = 25 * tilemap.tileset->tile_height - trap.height},
+      .speed = 1,
+      .max_speed = 10,
+      .direction = 0
+
+  };
 
   while (!WindowShouldClose()) {
     if (menu == MAIN_MENU) {
@@ -1059,6 +1191,7 @@ int main() {
 
       Update(&player_state, &camera, &tilemap, &current_mode);
       UpdateFloaters(floaters, &player_state);
+      UpdateTrap(&trap, &player_state);
 
       BeginDrawing();
 
@@ -1071,6 +1204,9 @@ int main() {
       ClearBackground(RAYWHITE);
 
       DrawPlatform(&window, &platform, &tilemap, &player_state, floaters);
+      DrawHP(&player_state);
+      DrawRectangleRec(trap.hitbox, BLUE);
+      DrawTrap(&trap);
 
       DrawRectangleRec(player, RED);
 
@@ -1152,13 +1288,16 @@ int main() {
       EndMode2D();
       EndDrawing();
       if ((player_state.player->y) > (tilemap.height - 32)) {
-          StopSound(sound_walking);
-        menu = DEATH_MENU;
+        StopSound(sound_walking);
+        player_state.hp = 0;
       }
       // printf("%f \n", player_state.player->y);
     }
 
-    if (menu == DEATH_MENU) {
+    if (player_state.hp <= 0) {
+
+      menu = DEATH_MENU;
+      StopSound(sound_walking);
       BeginDrawing();
       ClearBackground(GetColor(0x590404FF));
 
@@ -1177,11 +1316,11 @@ int main() {
                   // below falling level; see below comment;
         player_state.player->x =
             0; // Need to reset all other (x,speed etc) too , but I think it
-               // will be better to write a deathfunction and handle this using
-               // that instead of everything else
+        // will be better to write a deathfunction and handle this using
+        // that instead of everything else
 
-               player_state.last_direction = 1;
-
+        player_state.last_direction = 1;
+        player_state.hp = 1;
       }
     }
   }
@@ -1189,10 +1328,9 @@ int main() {
   UnloadSound(sound_walking);
   CloseAudioDevice();
   UnloadTexture(tileset_texture);
-  for(int i = 0; i < animation_states_count; i++){
-      UnloadTexture(animation_states[i].sprite.sheet);
+  for (int i = 0; i < animation_states_count; i++) {
+    UnloadTexture(animation_states[i].sprite.sheet);
   }
 
   CloseWindow();
-
 }
