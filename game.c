@@ -1,7 +1,9 @@
 #include <raylib.h>
+#include <stdalign.h>
 #include <stdbool.h>
 #include <stdio.h>
 
+// #define DEBUG
 
 typedef enum { MAIN_MENU, GAME_MENU, DEATH_MENU } Menus;
 
@@ -65,6 +67,7 @@ typedef struct {
   bool is_attack_hit;
   bool in_attack_light;
   bool is_being_hit;
+  bool death_sound;
 
   Texture2D attack_light_sprite;
   Texture2D attack_light_sprite_back;
@@ -208,6 +211,66 @@ typedef struct {
   MobAnimation golem_death_back;
 
 } MobGolem;
+
+typedef struct {
+
+  MobMode mode;
+
+  float hp;
+
+  Rectangle hurtbox;
+  Rectangle bullet_hitbox;
+
+  Vector2 lower_bound;
+  Vector2 upper_bound;
+  Vector2 bullet_destination;
+
+  float damage;
+  float walk_speed;
+  float bullet_speed;
+  float idle_buffer;
+  float no_damage_time;
+
+  bool direction;
+  bool player_direction_rel;
+  bool bullet_released;
+  bool bullet_direction;
+
+  MobAnimation golemr_walk;
+  MobAnimation golemr_attack;
+  MobAnimation golemr_bullet;
+  MobAnimation golemr_death;
+
+  MobAnimation golemr_bullet_back;
+  MobAnimation golemr_walk_back;
+  MobAnimation golemr_attack_back;
+  MobAnimation golemr_death_back;
+
+} MobGolemR;
+
+typedef enum { TRAMPOLINE_IDLE, TRAMPOLINE_ACTIVE } TrampolineMode;
+
+typedef struct {
+
+  TrampolineMode mode;
+
+  Vector2 position;
+
+  int width;
+  int height;
+  int frame_count;
+  int current_frame_no;
+
+  Texture2D sprite;
+
+  float time_needed;
+  float time_passed;
+
+  Rectangle current_frame_rec;
+
+  int height_trampoline[2];
+
+} Trampoline;
 
 float diff(float a, float b) { return ((a - b > 0) ? (a - b) : (b - a)); }
 
@@ -355,9 +418,9 @@ bool CollisionResponse(TileInformation *tile_info, PlayerState *player_state,
 
       else {
         player_state->player->x =
-            tile_info->rec->x - player_state->player->width - x_push_back;
+            tile_info->rec->x - player_state->player->width - x_push_back * 2.5;
 
-        player_state->player->y += player_state->sliding_speed;
+        player_state->player->y += player_state->sliding_speed * 2.5;
       }
     }
 
@@ -379,9 +442,9 @@ bool CollisionResponse(TileInformation *tile_info, PlayerState *player_state,
 
       else {
         player_state->player->x =
-            tile_info->rec->x + tile_info->rec->width + x_push_back;
+            tile_info->rec->x + tile_info->rec->width + x_push_back * 2.5;
 
-        player_state->player->y += player_state->sliding_speed;
+        player_state->player->y += player_state->sliding_speed * 2.5;
       }
     }
   }
@@ -432,7 +495,9 @@ bool FloaterCollisionResponse(Floater *floater, PlayerState *player_state) {
       if (i == 0) {
 
         if ((player_state->player->y + player_state->player->height) <=
-            (floater->position.y + buffer)) {
+                (floater->position.y + buffer) &&
+            (player_state->player->x + player_state->player->width >=
+             floater->position.x + 6)) {
           player_state->player->y = floater->position.y -
                                     player_state->player->height +
                                     floater->speed + y_push_back;
@@ -457,7 +522,9 @@ bool FloaterCollisionResponse(Floater *floater, PlayerState *player_state) {
       else if (i == floater->floater_width - 1) {
 
         if ((player_state->player->y + player_state->player->height) <=
-            (floater->position.y + buffer)) {
+                (floater->position.y + buffer) &&
+            (player_state->player->x <
+             floater->position.x + (i + 1) * 32 - 6)) {
           player_state->player->y = floater->position.y -
                                     player_state->player->height +
                                     floater->speed + y_push_back;
@@ -509,48 +576,140 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
   const int data_size = (cols) * (rows);
 
   const short data[] = {
-      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 7, 8, 0, 0, 0, 0, 0, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 7, 7, 7, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 3, 0, 0, 0, 0, 0, 71, 11, 10, 10, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65, 24, 37, 37, 37, 37, 66, 0, 0, 0, 0, 0, 65, 4, 4, 4, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  34, 11, 33, 2, 34, 10, 11, 33, 2, 2, 2, 2, 34, 37, 24, 24, 15, 14, 37, 64, 0, 0, 0, 0, 0, 65, 4, 4, 37, 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  40, 4, 4, 15, 4, 4, 4, 4, 14, 14, 14, 15, 4, 15, 37, 14, 4, 4, 14, 62, 0, 0, 0, 0, 0, 65, 4, 4, 4, 35, 33, 34, 10, 10, 33, 2, 2, 34, 10, 33, 2, 2, 3, 0, 0, 0, 0, 0, 0, 0,
-                  4, 4, 4, 4, 4, 39, 4, 4, 4, 4, 4, 4, 4, 4, 15, 4, 4, 4, 4, 62, 0, 0, 0, 0, 0, 53, 4, 4, 4, 4, 4, 4, 4, 4, 4, 14, 15, 4, 4, 4, 14, 15, 66, 0, 0, 0, 0, 0, 0, 0,
-                  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 40, 4, 62, 0, 0, 0, 0, 0, 61, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 64, 0, 0, 0, 0, 0, 0, 0,
-                  4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 40, 4, 4, 4, 4, 4, 4, 4, 4, 62, 0, 0, 0, 0, 0, 61, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 35, 10, 10, 11, 11, 11, 10, 10,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 0, 0, 0, 0, 0, 61, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 0, 0, 0, 0, 0, 61, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  6,  7,  7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  6,
+      7,  7,  7,  7,  7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  6,  7,  7,  7,  7,  7,  7,  7,  7,
+      7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  6,  7,  7,  7,  7,
+      7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  6,  7,  7,  7,  7,  7,  7,  7,
+      7,  7,  7,  7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  6,  7,  7,  7,  7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  1,  2,  2,  2,  2,  2,  3,  0,  0,  0,  0,  0,  71, 11, 10, 10, 12,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  65, 24, 37,
+      37, 37, 37, 66, 0,  0,  0,  0,  0,  65, 4,  4,  4,  62, 0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  34, 11,
+      33, 2,  34, 10, 11, 33, 2,  2,  2,  2,  34, 37, 24, 24, 15, 14, 37, 64,
+      0,  0,  0,  0,  0,  65, 4,  4,  37, 62, 0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  40, 4,  4,  15, 4,  4,
+      4,  4,  14, 14, 14, 15, 4,  15, 37, 14, 4,  4,  14, 62, 0,  0,  0,  0,
+      0,  65, 4,  4,  4,  35, 33, 34, 10, 10, 33, 2,  2,  34, 10, 33, 2,  2,
+      3,  0,  0,  0,  0,  0,  0,  0,  4,  4,  4,  4,  4,  39, 4,  4,  4,  4,
+      4,  4,  4,  4,  15, 4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  53, 4,  4,
+      4,  4,  4,  4,  4,  4,  4,  14, 15, 4,  4,  4,  14, 15, 66, 0,  0,  0,
+      0,  0,  0,  0,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  40, 4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  64, 0,  0,  0,  0,  0,  0,  0,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  40, 4,  4,  4,  4,  4,  4,  4,
+      4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  35, 10, 10, 11, 11, 11, 10, 10, 0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  62, 0,  0,
+      0,  0,  0,  61, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  62, 0,  0,  0,  0,  0,  61,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0};
 
   Rectangle current_tile =
       (Rectangle){.x = 0, .y = 0, .width = 32, .height = 32};
@@ -712,8 +871,8 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
     camera->target.x = tilemap->width - camera->offset.x / (camera->zoom);
   }
 
-  if ((camera->target.y) - (GetScreenHeight() / (2.0 * camera->zoom)) <= 0) {
-    camera->target.y = camera->offset.y / (camera->zoom);
+  if ((camera->target.y) - (GetScreenHeight() / (2.0 * camera->zoom)) <= 160) {
+    camera->target.y = (camera->offset.y) / (camera->zoom) + 160;
   }
 
   if ((camera->target.y) + (GetScreenHeight() / (2.0 * camera->zoom)) >=
@@ -1036,7 +1195,8 @@ void DrawHP(PlayerState *player_state) {
 }
 
 void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
-                       MobGolem *golem, Sound *sound_golem_hit) {
+                       MobGolem *golem, Sound *sound_golem_hit,
+                       MobGolemR *golemr) {
 
   if (player_state->is_being_hit) {
     return;
@@ -1078,15 +1238,18 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
                          .width = 150,
                          .height = 64};
 
+#ifdef DEBUG
     DrawRectangleRec(hitbox, GREEN);
 
     DrawRectangle(player_state->player->x, player_state->player->y, 32, 64,
                   RED);
 
+#endif
+
     DrawTextureRec(player_state->attack_light_sprite,
                    player_state->attack_light_current_frame_rec,
                    (Vector2){.x = player_state->player->x - 85,
-                             .y = player_state->player->y - 130},
+                             .y = player_state->player->y - 127},
                    WHITE);
   }
 
@@ -1097,17 +1260,18 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
                          .y = player_state->player->y,
                          .width = 150,
                          .height = 64};
-
+#ifdef DEBUG
     DrawRectangleRec(hitbox, GREEN);
 
     DrawRectangle(player_state->player->x, player_state->player->y, 32, 64,
                   RED);
+#endif
 
     DrawTextureRec(player_state->attack_light_sprite_back,
                    player_state->attack_light_current_frame_rec,
                    (Vector2){.x = player_state->player->x - 85 - 150 -
                                   player_state->player->width,
-                             .y = player_state->player->y - 130},
+                             .y = player_state->player->y - 127},
                    WHITE);
   }
 
@@ -1123,8 +1287,27 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
       golem->direction = 0;
     }
 
-    PlaySound(*sound_golem_hit);
+    if (golem->hp > 0) {
+      PlaySound(*sound_golem_hit);
+    }
   }
+
+  if (player_state->is_attack_hit &&
+      SimpleCollisionCheck(&hitbox, &golemr->hurtbox)) {
+    golemr->hp -= player_state->attack_light_damage;
+    player_state->is_attack_hit = 0;
+    golemr->idle_buffer = .7;
+
+
+    if (golemr->hp > 0) {
+      PlaySound(*sound_golem_hit);
+    }
+  }
+
+  // if (golem->hp > 0) {
+  //   PlaySound(*sound_golem_hit);
+  // }
+  // }
 }
 
 void UpdateGolem(MobGolem *golem, PlayerState *player_state,
@@ -1248,13 +1431,17 @@ void DrawGolemHP(MobGolem *golem) {
   DrawRectangleRounded(hp_bar, 1, 0, color);
 }
 
-void DrawGolem(MobGolem *golem, PlayerState *player_state,
-               Sound *golem_attack, Sound* golem_dead) {
+void DrawGolem(MobGolem *golem, PlayerState *player_state, Sound *golem_attack,
+               Sound *golem_dead) {
 
   if (golem->mode == MOB_DEAD) {
     return;
   }
+
+#ifdef DEBUG
   DrawRectangleRec(golem->hurtbox, BLUE);
+#endif
+
   DrawGolemHP(golem);
 
   if (golem->mode == MOB_IDLE) {
@@ -1263,14 +1450,14 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state,
 
       DrawTextureRec(
           golem->golem_run.sprite, golem->golem_run.current_frame_rec,
-          (Vector2){.x = golem->hurtbox.x - 13, .y = golem->hurtbox.y - 32},
+          (Vector2){.x = golem->hurtbox.x - 25, .y = golem->hurtbox.y - 32},
           WHITE);
     }
 
     else {
       DrawTextureRec(
           golem->golem_run_back.sprite, golem->golem_run.current_frame_rec,
-          (Vector2){.x = golem->hurtbox.x - 17, .y = golem->hurtbox.y - 32},
+          (Vector2){.x = golem->hurtbox.x - 29, .y = golem->hurtbox.y - 32},
           WHITE);
     }
   }
@@ -1314,13 +1501,13 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state,
         return;
       }
 
-      golem->golem_attack.current_frame_rec.x =(
-          golem->golem_attack.current_frame_no - 1) *
+      golem->golem_attack.current_frame_rec.x =
+          (golem->golem_attack.current_frame_no - 1) *
           golem->golem_attack.current_frame_rec.width;
 
       DrawTextureRec(
           golem->golem_attack.sprite, golem->golem_attack.current_frame_rec,
-          (Vector2){.x = golem->hurtbox.x - 13, .y = golem->hurtbox.y - 32},
+          (Vector2){.x = golem->hurtbox.x - 25, .y = golem->hurtbox.y - 32},
           WHITE);
     }
 
@@ -1349,14 +1536,14 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state,
         return;
       }
 
-      golem->golem_attack_back.current_frame_rec.x =(
-          golem->golem_attack_back.current_frame_no - 1) *
+      golem->golem_attack_back.current_frame_rec.x =
+          (golem->golem_attack_back.current_frame_no - 1) *
           golem->golem_attack_back.current_frame_rec.width;
 
       DrawTextureRec(
           golem->golem_attack_back.sprite,
           golem->golem_attack_back.current_frame_rec,
-          (Vector2){.x = golem->hurtbox.x - 17, .y = golem->hurtbox.y - 32},
+          (Vector2){.x = golem->hurtbox.x - 29, .y = golem->hurtbox.y - 32},
           WHITE);
     }
   }
@@ -1372,8 +1559,8 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state,
         golem->golem_death.time_passed = 0;
       }
 
-      if(golem -> golem_death.current_frame_no == 2){
-          PlaySound(*golem_dead);
+      if (golem->golem_death.current_frame_no == 2) {
+        PlaySound(*golem_dead);
       }
 
       if (golem->golem_death.current_frame_no >
@@ -1390,7 +1577,7 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state,
 
       DrawTextureRec(
           golem->golem_death.sprite, golem->golem_death.current_frame_rec,
-          (Vector2){.x = golem->hurtbox.x - 13, .y = golem->hurtbox.y - 32},
+          (Vector2){.x = golem->hurtbox.x - 25, .y = golem->hurtbox.y - 32},
           WHITE);
     }
 
@@ -1404,8 +1591,8 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state,
         golem->golem_death_back.time_passed = 0;
       }
 
-      if(golem -> golem_death_back.current_frame_no == 2){
-          PlaySound(*golem_dead);
+      if (golem->golem_death_back.current_frame_no == 2) {
+        PlaySound(*golem_dead);
       }
 
       if (golem->golem_death_back.current_frame_no >
@@ -1416,14 +1603,14 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state,
         return;
       }
 
-      golem->golem_death_back.current_frame_rec.x =(
-          golem->golem_death_back.current_frame_no - 1) *
+      golem->golem_death_back.current_frame_rec.x =
+          (golem->golem_death_back.current_frame_no - 1) *
           golem->golem_death_back.current_frame_rec.width;
 
       DrawTextureRec(
           golem->golem_death_back.sprite,
           golem->golem_death_back.current_frame_rec,
-          (Vector2){.x = golem->hurtbox.x - 17, .y = golem->hurtbox.y - 32},
+          (Vector2){.x = golem->hurtbox.x - 29, .y = golem->hurtbox.y - 32},
           WHITE);
     }
   }
@@ -1444,13 +1631,13 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state,
         return;
       }
 
-      golem->golem_walk.current_frame_rec.x =(
-          golem->golem_walk.current_frame_no - 1) *
+      golem->golem_walk.current_frame_rec.x =
+          (golem->golem_walk.current_frame_no - 1) *
           golem->golem_walk.current_frame_rec.width;
 
       DrawTextureRec(
           golem->golem_walk.sprite, golem->golem_walk.current_frame_rec,
-          (Vector2){.x = golem->hurtbox.x - 13, .y = golem->hurtbox.y - 32},
+          (Vector2){.x = golem->hurtbox.x - 25, .y = golem->hurtbox.y - 32},
           WHITE);
     }
 
@@ -1470,14 +1657,14 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state,
         return;
       }
 
-      golem->golem_walk_back.current_frame_rec.x =(
-          golem->golem_walk_back.current_frame_no - 1) *
+      golem->golem_walk_back.current_frame_rec.x =
+          (golem->golem_walk_back.current_frame_no - 1) *
           golem->golem_walk_back.current_frame_rec.width;
 
       DrawTextureRec(
           golem->golem_walk_back.sprite,
           golem->golem_walk_back.current_frame_rec,
-          (Vector2){.x = golem->hurtbox.x - 17, .y = golem->hurtbox.y - 32},
+          (Vector2){.x = golem->hurtbox.x - 29, .y = golem->hurtbox.y - 32},
           WHITE);
     }
   }
@@ -1498,13 +1685,13 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state,
         return;
       }
 
-      golem->golem_run.current_frame_rec.x =(
-          golem->golem_run.current_frame_no - 1) *
+      golem->golem_run.current_frame_rec.x =
+          (golem->golem_run.current_frame_no - 1) *
           golem->golem_run.current_frame_rec.width;
 
       DrawTextureRec(
           golem->golem_run.sprite, golem->golem_run.current_frame_rec,
-          (Vector2){.x = golem->hurtbox.x - 13, .y = golem->hurtbox.y - 32},
+          (Vector2){.x = golem->hurtbox.x - 25, .y = golem->hurtbox.y - 32},
           WHITE);
     }
 
@@ -1524,15 +1711,524 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state,
         return;
       }
 
-      golem->golem_run_back.current_frame_rec.x =(
-          golem->golem_run_back.current_frame_no - 1) *
+      golem->golem_run_back.current_frame_rec.x =
+          (golem->golem_run_back.current_frame_no - 1) *
           golem->golem_run_back.current_frame_rec.width;
 
       DrawTextureRec(
           golem->golem_run_back.sprite, golem->golem_run_back.current_frame_rec,
-          (Vector2){.x = golem->hurtbox.x - 17, .y = golem->hurtbox.y - 32},
+          (Vector2){.x = golem->hurtbox.x - 29, .y = golem->hurtbox.y - 32},
           WHITE);
     }
+  }
+}
+
+bool SimpleCollisionResolver(Rectangle *rec1, Rectangle *rec2,
+                             PlayerState *player_state) {
+  if (SimpleCollisionCheck(rec1, rec2)) {
+    if (rec1->y + rec1->height <= rec2->y + 10) {
+      rec1->y = rec2->y - rec1->height;
+      player_state->jump_left = 2;
+    }
+
+    else if (rec1->x + rec1->width <= rec2->x + rec2->width / 2.0) {
+      rec1->x = rec2->x - rec1->width - 0.5;
+    }
+
+    else {
+      rec1->x = rec2->x + rec2->width + 0.5;
+    }
+
+    return 1;
+  }
+
+  return 0;
+}
+
+void UpdateTrampoline(Trampoline *trampoline, PlayerState *player_state) {
+
+  Rectangle trampoline_hitbox = (Rectangle){.x = trampoline->position.x,
+                                            .y = trampoline->position.y + 20,
+                                            .height = 8,
+                                            .width = 28};
+
+  if (SimpleCollisionCheck(player_state->player, &trampoline_hitbox)) {
+    trampoline->mode = TRAMPOLINE_ACTIVE;
+  }
+
+  if (trampoline->mode == TRAMPOLINE_ACTIVE) {
+
+    if (trampoline->current_frame_no == 2) {
+      player_state->player->y -= 20;
+    } else if (trampoline->current_frame_no <= 5) {
+      player_state->player->y -= 6 + (.1 * trampoline->current_frame_no);
+
+      if (IsKeyDown(KEY_D)) {
+        player_state->player->x += .9;
+      }
+
+      if (IsKeyDown(KEY_A)) {
+        player_state->player->x -= .9;
+      }
+    }
+  }
+}
+
+void DrawTrampoline(Trampoline *trampoline, Sound* sound_spring) {
+  if (trampoline->mode == TRAMPOLINE_IDLE) {
+    DrawTextureRec(
+        trampoline->sprite, trampoline->current_frame_rec,
+        (Vector2){.x = trampoline->position.x, .y = trampoline->position.y},
+        WHITE);
+  }
+
+  if (trampoline->mode == TRAMPOLINE_ACTIVE) {
+    trampoline->time_passed += GetFrameTime();
+
+    if(trampoline->current_frame_no == 1){
+       PlaySound(*sound_spring);
+    }
+
+    if (trampoline->time_passed >= trampoline->time_needed) {
+      trampoline->time_passed = 0;
+
+      trampoline->current_frame_no++;
+    }
+
+    if (trampoline->current_frame_no > trampoline->frame_count) {
+      trampoline->current_frame_no = 1;
+      trampoline->mode = TRAMPOLINE_IDLE;
+      return;
+    }
+
+    trampoline->current_frame_rec.x =
+        (trampoline->current_frame_no - 1) * (trampoline->width);
+
+    DrawTextureRec(
+        trampoline->sprite, trampoline->current_frame_rec,
+        (Vector2){.x = trampoline->position.x, .y = trampoline->position.y},
+        WHITE);
+  }
+}
+
+void UpdateGolemR(MobGolemR *golemr, PlayerState *player_state, Sound* sound_golemr_collision) {
+
+  if (golemr->hp <= 0) {
+    if (!(golemr->mode == MOB_DEAD)) {
+      golemr->mode = MOB_DYING;
+    }
+    return;
+  }
+
+  if (golemr->idle_buffer > 0) {
+    golemr->idle_buffer -= GetFrameTime();
+    golemr->mode = MOB_IDLE;
+    return;
+  }
+
+  else {
+    golemr->idle_buffer = 0;
+    golemr -> mode = MOB_WALK;
+  }
+
+  if (golemr->no_damage_time > 0) {
+    golemr->no_damage_time -= GetFrameTime();
+  } else {
+    golemr->no_damage_time = 0;
+  }
+
+  if (SimpleCollisionResolver(player_state->player, &golemr->hurtbox,
+                              player_state)) {
+    if (golemr->no_damage_time == 0) {
+      player_state->hp -= 0.5;
+      golemr->no_damage_time = 1;
+
+      PlaySound(*sound_golemr_collision);
+    }
+  };
+
+  if (golemr->mode == MOB_IDLE) {
+  }
+
+  if (golemr->mode == MOB_WALK) {
+    if (golemr->hurtbox.x <= golemr->lower_bound.x) {
+      golemr->direction = 1;
+    }
+
+    if (golemr->hurtbox.x >= golemr->upper_bound.x) {
+      golemr->direction = 0;
+    }
+    golemr->hurtbox.x += (golemr->direction ? (1) : (-1)) * golemr->walk_speed;
+  }
+
+  if (diff(golemr->hurtbox.x + golemr->hurtbox.width / 2.0,
+           player_state->player->x) <= 7 * 32 &&
+      (player_state->player->y + player_state->player->height >
+       golemr->hurtbox.y) &&
+      (player_state->player->y < golemr->hurtbox.height + golemr->hurtbox.y) &&
+      !(golemr->bullet_released)) {
+    golemr->mode = MOB_ATTACK;
+
+    if (player_state->player->x < golemr->hurtbox.x) {
+      golemr->direction = 0;
+    } else {
+      golemr->direction = 1;
+    }
+  }
+}
+
+void DrawGolemRHP(MobGolemR *golemr) {
+
+#ifdef DEBUG
+  DrawRectangleRec(golemr->hurtbox, BLUE);
+#endif
+
+  Rectangle back =
+      (Rectangle){.width = 55,
+                  .height = 4,
+                  .x = golemr->hurtbox.x + golemr->hurtbox.width / 2.0 - 27.5,
+                  .y = golemr->hurtbox.y - 20};
+
+  Rectangle hp_bar = (Rectangle){.width = back.width * golemr->hp,
+                                 .height = 4,
+                                 .x = back.x,
+                                 .y = golemr->hurtbox.y - 20};
+
+  Color color;
+
+  if (golemr->hp > 0.56) {
+    color = (Color){22, 196, 127, 255};
+  }
+
+  else if (golemr->hp <= 0.56 && golemr->hp >= 20.6) {
+    color = (Color){255, 214, 90, 255};
+  }
+
+  else {
+    color = (Color){249, 56, 39, 255};
+  }
+
+  DrawRectangleRounded(back, 1, 0, LIGHTGRAY);
+  DrawRectangleRounded(hp_bar, 1, 0, color);
+}
+
+void UpdateBullet(MobGolemR *golemr, PlayerState *player_state, Sound* sound_bullet_hit) {
+
+  if (golemr->bullet_direction) {
+
+    if (SimpleCollisionCheck(player_state->player, &golemr->bullet_hitbox)) {
+      player_state->hp -= .20;
+      golemr->bullet_released = false;
+
+          PlaySound(*sound_bullet_hit);
+    }
+
+    else if (golemr->bullet_hitbox.x >= golemr->bullet_destination.x) {
+      golemr->bullet_released = false;
+    }
+
+    else {
+      golemr->bullet_hitbox.x += golemr->bullet_speed;
+    }
+  }
+
+  else {
+    if (SimpleCollisionCheck(player_state->player, &golemr->bullet_hitbox)) {
+      player_state->hp -= .20;
+      golemr->bullet_released = false;
+      PlaySound(*sound_bullet_hit);
+    }
+
+    else if (golemr->bullet_hitbox.x <= golemr->bullet_destination.x) {
+      golemr->bullet_released = false;
+    }
+
+    else {
+      golemr->bullet_hitbox.x -= golemr->bullet_speed;
+    }
+  }
+}
+
+void DrawBullet(MobGolemR *golemr) {
+
+  if (golemr->bullet_direction) {
+
+    if (golemr->golemr_bullet.time_passed >=
+        golemr->golemr_bullet.time_needed) {
+      golemr->golemr_bullet.time_passed = 0;
+      golemr->golemr_bullet.current_frame_no++;
+    }
+
+    if (golemr->golemr_bullet.current_frame_no >
+        golemr->golemr_bullet.frame_count) {
+      golemr->golemr_bullet.current_frame_no = 1;
+    }
+
+    golemr->golemr_bullet.current_frame_rec.x =
+        (golemr->golemr_bullet.current_frame_no - 1) * 64;
+
+    DrawTextureRec(golemr->golemr_bullet.sprite,
+                   golemr->golemr_bullet.current_frame_rec,
+                   (Vector2){.x = golemr->bullet_hitbox.x - 23,
+                             .y = golemr->bullet_hitbox.y - 28},
+                   WHITE);
+  }
+
+  else {
+    if (golemr->golemr_bullet_back.time_passed >=
+        golemr->golemr_bullet_back.time_needed) {
+      golemr->golemr_bullet_back.time_passed = 0;
+      golemr->golemr_bullet_back.current_frame_no++;
+    }
+
+    if (golemr->golemr_bullet_back.current_frame_no >
+        golemr->golemr_bullet_back.frame_count) {
+      golemr->golemr_bullet_back.current_frame_no = 1;
+    }
+
+    golemr->golemr_bullet_back.current_frame_rec.x =
+        (golemr->golemr_bullet_back.current_frame_no - 1) * 64;
+
+    DrawTextureRec(golemr->golemr_bullet_back.sprite,
+                   golemr->golemr_bullet_back.current_frame_rec,
+                   (Vector2){.x = golemr->bullet_hitbox.x - 23,
+                             .y = golemr->bullet_hitbox.y - 28},
+                   WHITE);
+  }
+}
+
+void DrawGolemR(MobGolemR *golemr, PlayerState *player_state,
+                Sound *golemr_dead, Sound* golemr_bullet, Sound* sound_bullet_hit) {
+
+  DrawGolemRHP(golemr);
+
+  if (golemr->mode == MOB_IDLE) {
+
+    if (golemr->direction) {
+      DrawTextureRec(
+          golemr->golemr_walk.sprite,
+          (Rectangle){.x = 0, .y = 0, .width = 64, .height = 64},
+          (Vector2){.x = golemr->hurtbox.x - 25, .y = golemr->hurtbox.y - 32},
+          WHITE);
+    }
+
+    else {
+      DrawTextureRec(
+          golemr->golemr_walk_back.sprite,
+          (Rectangle){.x = 0, .y = 0, .width = 64, .height = 64},
+          (Vector2){.x = golemr->hurtbox.x - 25, .y = golemr->hurtbox.y - 32},
+          WHITE);
+    }
+  }
+
+  if (golemr->mode == MOB_WALK) {
+
+    if (golemr->direction) {
+
+      golemr->golemr_walk.time_passed += GetFrameTime();
+
+      if (golemr->golemr_walk.time_passed >= golemr->golemr_walk.time_needed) {
+        golemr->golemr_walk.time_passed = 0;
+        golemr->golemr_walk.current_frame_no++;
+      }
+
+      if (golemr->golemr_walk.current_frame_no >
+          golemr->golemr_walk.frame_count) {
+        golemr->golemr_walk.current_frame_no = 1;
+      }
+
+      golemr->golemr_walk.current_frame_rec.x =
+          (golemr->golemr_walk.current_frame_no - 1) * (96.75);
+
+      DrawTextureRec(
+          golemr->golemr_walk.sprite, golemr->golemr_walk.current_frame_rec,
+          (Vector2){.x = golemr->hurtbox.x - 25, .y = golemr->hurtbox.y - 32},
+          WHITE);
+
+    }
+
+    else {
+
+      golemr->golemr_walk_back.time_passed += GetFrameTime();
+
+      if (golemr->golemr_walk_back.time_passed >=
+          golemr->golemr_walk_back.time_needed) {
+        golemr->golemr_walk_back.time_passed = 0;
+        golemr->golemr_walk_back.current_frame_no++;
+      }
+
+      if (golemr->golemr_walk_back.current_frame_no >
+          golemr->golemr_walk_back.frame_count) {
+        golemr->golemr_walk_back.current_frame_no = 1;
+      }
+
+      golemr->golemr_walk_back.current_frame_rec.x =
+          (golemr->golemr_walk_back.current_frame_no - 1) * (96.75);
+
+      DrawTextureRec(
+          golemr->golemr_walk_back.sprite,
+          golemr->golemr_walk_back.current_frame_rec,
+          (Vector2){.x = golemr->hurtbox.x - 29, .y = golemr->hurtbox.y - 32},
+          WHITE);
+    }
+  }
+
+  if (golemr->mode == MOB_ATTACK) {
+    if (player_state->player->x >= golemr->hurtbox.x) {
+
+      golemr->golemr_attack.time_passed += GetFrameTime();
+
+      if (golemr->golemr_attack.time_passed >=
+          golemr->golemr_attack.time_needed) {
+        golemr->golemr_attack.time_passed = 0;
+        golemr->golemr_attack.current_frame_no++;
+      }
+
+      if (golemr->golemr_attack.current_frame_no == 7) {
+
+
+          PlaySound(*golemr_bullet);
+        golemr->bullet_released = true;
+        golemr->bullet_direction = golemr->direction;
+        golemr->bullet_destination =
+            (Vector2){.x = golemr->hurtbox.x +
+                           7 * 32 * (golemr->bullet_direction ? (1) : (-1)),
+                      .y = golemr->hurtbox.y};
+
+        golemr->bullet_hitbox.x = golemr->hurtbox.x + 20;
+        golemr->bullet_hitbox.y = golemr->hurtbox.y + 20;
+      }
+
+      if (golemr->golemr_attack.current_frame_no >
+          golemr->golemr_attack.frame_count) {
+        golemr->golemr_attack.current_frame_no = 1;
+        golemr->mode = MOB_WALK;
+        return;
+      }
+
+      golemr->golemr_attack.current_frame_rec.x =
+          (golemr->golemr_attack.current_frame_no - 1) * (99.3);
+
+      DrawTextureRec(
+          golemr->golemr_attack.sprite, golemr->golemr_attack.current_frame_rec,
+          (Vector2){.x = golemr->hurtbox.x - 25, .y = golemr->hurtbox.y - 32},
+          WHITE);
+
+    } else {
+
+      golemr->golemr_attack_back.time_passed += GetFrameTime();
+
+      if (golemr->golemr_attack_back.time_passed >=
+          golemr->golemr_attack_back.time_needed) {
+        golemr->golemr_attack_back.time_passed = 0;
+        golemr->golemr_attack_back.current_frame_no++;
+      }
+
+      if (golemr->golemr_attack_back.current_frame_no == 7) {
+
+          PlaySound(*golemr_bullet);
+
+        golemr->bullet_released = true;
+        golemr->bullet_direction = golemr->direction;
+        golemr->bullet_destination =
+            (Vector2){.x = golemr->hurtbox.x +
+                           7 * 32 * (golemr->bullet_direction ? (1) : (-1)),
+                      .y = golemr->hurtbox.y};
+
+        golemr->bullet_hitbox.x = golemr->hurtbox.x + 20;
+        golemr->bullet_hitbox.y = golemr->hurtbox.y + 20;
+      }
+
+      if (golemr->golemr_attack_back.current_frame_no >
+          golemr->golemr_attack_back.frame_count) {
+        golemr->golemr_attack_back.current_frame_no = 1;
+        golemr->mode = MOB_WALK;
+        return;
+      }
+
+      golemr->golemr_attack_back.current_frame_rec.x =
+          (golemr->golemr_attack_back.current_frame_no - 1) * (99.3);
+
+      DrawTextureRec(
+          golemr->golemr_attack_back.sprite,
+          golemr->golemr_attack_back.current_frame_rec,
+          (Vector2){.x = golemr->hurtbox.x - 25, .y = golemr->hurtbox.y - 32},
+          WHITE);
+    }
+  }
+
+  if (golemr->mode == MOB_DYING) {
+
+    if (golemr->direction) {
+
+      golemr->golemr_death.time_passed += GetFrameTime();
+
+      if (golemr->golemr_death.time_passed >=
+          golemr->golemr_death.time_needed) {
+        golemr->golemr_death.current_frame_no++;
+        golemr->golemr_death.time_passed = 0;
+      }
+
+      if (golemr->golemr_death.current_frame_no == 2) {
+        PlaySound(*golemr_dead);
+      }
+
+      if (golemr->golemr_death.current_frame_no >
+          golemr->golemr_death.frame_count) {
+        golemr->golemr_death.current_frame_no = 1;
+        golemr->mode = MOB_DEAD;
+        StopSound(*golemr_dead);
+        return;
+      }
+
+      golemr->golemr_death.current_frame_rec.x =
+          (golemr->golemr_death.current_frame_no - 1) *
+          golemr->golemr_death.current_frame_rec.width;
+
+      DrawTextureRec(
+          golemr->golemr_death.sprite, golemr->golemr_death.current_frame_rec,
+          (Vector2){.x = golemr->hurtbox.x - 25, .y = golemr->hurtbox.y - 32},
+          WHITE);
+    }
+
+    else {
+
+      golemr->golemr_death_back.time_passed += GetFrameTime();
+
+      if (golemr->golemr_death_back.time_passed >=
+          golemr->golemr_death_back.time_needed) {
+        golemr->golemr_death_back.current_frame_no++;
+        golemr->golemr_death_back.time_passed = 0;
+      }
+
+      if (golemr->golemr_death_back.current_frame_no == 2) {
+        PlaySound(*golemr_dead);
+      }
+
+      if (golemr->golemr_death_back.current_frame_no >
+          golemr->golemr_death_back.frame_count) {
+        golemr->golemr_death_back.current_frame_no = 1;
+        golemr->mode = MOB_DEAD;
+        StopSound(*golemr_dead);
+        return;
+      }
+
+      golemr->golemr_death_back.current_frame_rec.x =
+          (golemr->golemr_death_back.current_frame_no - 1) *
+          golemr->golemr_death_back.current_frame_rec.width;
+
+      DrawTextureRec(
+          golemr->golemr_death_back.sprite,
+          golemr->golemr_death_back.current_frame_rec,
+          (Vector2){.x = golemr->hurtbox.x - 29, .y = golemr->hurtbox.y - 32},
+          WHITE);
+    }
+  }
+
+  if (golemr->bullet_released && golemr->mode != MOB_IDLE) {
+    DrawRectangleRec(golemr->bullet_hitbox, YELLOW);
+    UpdateBullet(golemr, player_state, sound_bullet_hit);
+    DrawBullet(golemr);
   }
 }
 
@@ -1555,9 +2251,9 @@ int main() {
 
   TilemapState tilemap = (TilemapState){.tileset = &tileset,
                                         .width = 50 * tileset.tile_width,
-                                        .height = 42 * tileset.tile_height};
+                                        .height = 48 * tileset.tile_height};
 
-  Rectangle player = (Rectangle){.x = 0, .y = 1000, .width = 32, .height = 64};
+  Rectangle player = (Rectangle){.x = 0, .y = 1160, .width = 32, .height = 64};
   PlayerState player_state = (PlayerState){
       .player = &player,
       .speed = 5.7,
@@ -1584,7 +2280,8 @@ int main() {
       .attack_light_sprite = LoadTexture("resources/hero/hero-attack.png"),
       .attack_light_sprite_back =
           LoadTexture("resources/hero/hero-attack-back.png"),
-      .is_being_hit = false
+      .is_being_hit = false,
+      .death_sound = false
 
   };
 
@@ -1601,14 +2298,14 @@ int main() {
   floaters[0] = (Floater){
       .floater = (int[]){44, 45, 45, 46},
       .floater_width = 4,
-      .speed = 0.7,
+      .speed = 1.1,
       .position = (Vector2){.x = 45 * tileset.tile_width,
-                            .y = 34 * tileset.tile_height},
+                            .y = 40 * tileset.tile_height},
       .type = VERTICAL,
       .lower_bound = (Vector2){.x = 45 * tileset.tile_width,
-                               .y = 34 * tileset.tile_height},
+                               .y = 40 * tileset.tile_height},
       .upper_bound = (Vector2){.x = 45 * tileset.tile_width,
-                               .y = 25 * tileset.tile_height},
+                               .y = 31 * tileset.tile_height},
       .direction = 1,
 
   };
@@ -1616,14 +2313,14 @@ int main() {
   floaters[1] =
       (Floater){.floater = (int[]){44, 45, 46},
                 .floater_width = 3,
-                .speed = 0.7,
+                .speed = 1.1,
                 .position = (Vector2){.x = 31 * tileset.tile_width,
-                                      .y = 25 * tileset.tile_height},
+                                      .y = 31 * tileset.tile_height},
                 .type = HORIZONTAL,
                 .upper_bound = (Vector2){.x = 31 * tileset.tile_width,
-                                         .y = 25 * tileset.tile_height},
+                                         .y = 31 * tileset.tile_height},
                 .lower_bound = (Vector2){.x = 22 * tileset.tile_width,
-                                         .y = 25 * tileset.tile_height},
+                                         .y = 31 * tileset.tile_height},
                 .direction = 0
 
       };
@@ -1631,14 +2328,14 @@ int main() {
   floaters[2] = (Floater){
       .floater = (int[]){44, 45, 45, 46},
       .floater_width = 4,
-      .speed = 0.7,
+      .speed = 1.1,
       .position =
-          (Vector2){.x = 2 * tileset.tile_width, .y = 25 * tileset.tile_height},
+          (Vector2){.x = 2 * tileset.tile_width, .y = 31 * tileset.tile_height},
       .type = VERTICAL,
       .upper_bound =
-          (Vector2){.x = 2 * tileset.tile_width, .y = 9 * tileset.tile_height},
+          (Vector2){.x = 2 * tileset.tile_width, .y = 15 * tileset.tile_height},
       .lower_bound =
-          (Vector2){.x = 2 * tileset.tile_width, .y = 25 * tileset.tile_height},
+          (Vector2){.x = 2 * tileset.tile_width, .y = 31 * tileset.tile_height},
       .direction = 0
 
   };
@@ -1659,6 +2356,11 @@ int main() {
   Sound sound_golem_hit = LoadSound("resources/audio/golem-hit.mp3");
   Sound sound_golem_attack = LoadSound("resources/audio/golem-attack.wav");
   Sound sound_golem_dead = LoadSound("resources/audio/golem-dead.mp3");
+  Sound sound_golemr_collision = LoadSound("resources/audio/golemr_collision.wav");
+  Sound sound_bullet =  LoadSound("resources/audio/bullet.wav");
+  Sound sound_bullet_hit =  LoadSound("resources/audio/bullet_hit.mp3");
+  Sound sound_spring=  LoadSound("resources/audio/spring.mp3");
+  Sound sound_nature=  LoadSound("resources/audio/nature.mp3");
   SetTargetFPS(window.fps);
 
   Trap trap = (Trap){
@@ -1668,7 +2370,7 @@ int main() {
       .damage = 1,
       .position =
           (Vector2){.x = 8 * tilemap.tileset->tile_width,
-                    .y = 25 * tilemap.tileset->tile_height - trap.height},
+                    .y = 31 * tilemap.tileset->tile_height - trap.height},
       .hitbox = (Rectangle){.width = trap.width,
                             .height = trap.height,
                             .x = trap.position.x,
@@ -1682,11 +2384,11 @@ int main() {
       .time_needed = 0.05,
       .time_passed = 0,
       .lower_bound =
-          (Vector2){.x = 8 * tilemap.tileset->tile_width,
-                    .y = 25 * tilemap.tileset->tile_height - trap.height},
+          (Vector2){.x = 8 * tilemap.tileset->tile_width + 15,
+                    .y = 31 * tilemap.tileset->tile_height - trap.height},
       .upper_bound =
           (Vector2){.x = 20 * tilemap.tileset->tile_width,
-                    .y = 25 * tilemap.tileset->tile_height - trap.height},
+                    .y = 31 * tilemap.tileset->tile_height - trap.height},
       .speed = 1,
       .max_speed = 10,
       .direction = 0
@@ -1702,14 +2404,14 @@ int main() {
 
       .mode = MOB_WALK,
       .hp = 1,
-      .hurtbox = (Rectangle){.x = 10 * tilemap.tileset->tile_width,
-                             .y = 15 * tilemap.tileset->tile_height + 24,
-                             .width = 64,
+      .hurtbox = (Rectangle){.x = 12 * tilemap.tileset->tile_width,
+                             .y = 21 * tilemap.tileset->tile_height + 24,
+                             .width = 40,
                              .height = 40},
-      .lower_bound = (Vector2){.x = 10 * tilemap.tileset->tile_width,
-                               .y = 15 * tilemap.tileset->tile_height + 24},
-      .upper_bound = (Vector2){.x = 22 * tilemap.tileset->tile_width,
-                               .y = 15 * tilemap.tileset->tile_height + 24},
+      .lower_bound = (Vector2){.x = 11 * tilemap.tileset->tile_width,
+                               .y = 21 * tilemap.tileset->tile_height + 24},
+      .upper_bound = (Vector2){.x = 21 * tilemap.tileset->tile_width,
+                               .y = 21 * tilemap.tileset->tile_height + 24},
 
       .damage = 0.35,
       .walk_speed = 1,
@@ -1813,7 +2515,150 @@ int main() {
 
   };
 
+  MobGolemR golemr = {
+
+      .mode = MOB_ATTACK,
+      .hp = 1,
+
+      .bullet_hitbox = (Rectangle){.x = 0, .y = 0, .width = 20, .height = 5},
+
+      .hurtbox = (Rectangle){.x = 24 * tilemap.tileset->tile_width,
+                             .y = 13 * tilemap.tileset->tile_height + 24,
+                             .width = 40,
+                             .height = 40},
+      .lower_bound = (Vector2){.x = 24 * tilemap.tileset->tile_width,
+                               .y = 13 * tilemap.tileset->tile_height + 24},
+      .upper_bound = (Vector2){.x = 28 * tilemap.tileset->tile_width,
+                               .y = 13 * tilemap.tileset->tile_height + 24},
+
+      .damage = 0.45,
+      .walk_speed = 1,
+      .bullet_speed = 9,
+      .idle_buffer = 0,
+      .no_damage_time = 0,
+
+      .direction = 1,
+      .player_direction_rel = 1,
+      .bullet_released = false,
+      .bullet_direction = 1,
+
+      .bullet_destination = (Vector2){.x = 0, .y = 0},
+
+      .golemr_walk =
+          (MobAnimation){
+              .sprite = LoadTexture("resources/mob/golem_r/golem_r_idle.png"),
+              .frame_count = 4,
+              .current_frame_no = 1,
+              .current_frame_rec =
+                  (Rectangle){.x = 0, .y = 0, .width = 96.75, .height = 64},
+              .time_needed = .15,
+              .time_passed = 0
+
+          },
+      .golemr_walk_back =
+          (MobAnimation){
+              .sprite =
+                  LoadTexture("resources/mob/golem_r/golem_r_idle_back.png"),
+              .frame_count = 4,
+              .current_frame_no = 1,
+              .current_frame_rec =
+                  (Rectangle){.x = 0, .y = 0, .width = 97, .height = 64},
+              .time_needed = .15,
+              .time_passed = 0
+
+          },
+
+      .golemr_attack =
+          (MobAnimation){
+
+              .sprite = LoadTexture("resources/mob/golem_r/golem_r_attack.png"),
+              .frame_count = 10,
+              .current_frame_no = 1,
+              .current_frame_rec =
+                  (Rectangle){.x = 0, .y = 0, .width = 99.3, .height = 64},
+              .time_needed = .09,
+              .time_passed = 0},
+
+      .golemr_attack_back =
+          (MobAnimation){
+
+              .sprite =
+                  LoadTexture("resources/mob/golem_r/golem_r_attack_back.png"),
+              .frame_count = 10,
+              .current_frame_no = 1,
+              .current_frame_rec =
+                  (Rectangle){.x = 0, .y = 0, .width = 99, .height = 64},
+              .time_needed = .11,
+              .time_passed = 0},
+
+      .golemr_bullet =
+          (MobAnimation){
+
+              .sprite = LoadTexture("resources/mob/golem_r/golem_r_bullet.png"),
+              .frame_count = 3,
+              .current_frame_no = 1,
+              .current_frame_rec =
+                  (Rectangle){.x = 0, .y = 0, .width = 64, .height = 64},
+              .time_needed = .07,
+              .time_passed = 0},
+
+      .golemr_bullet_back =
+          (MobAnimation){
+
+              .sprite =
+                  LoadTexture("resources/mob/golem_r/golem_r_bullet_back.png"),
+              .frame_count = 3,
+              .current_frame_no = 1,
+              .current_frame_rec =
+                  (Rectangle){.x = 0, .y = 0, .width = 64, .height = 64},
+              .time_needed = .07,
+              .time_passed = 0},
+
+      .golemr_death =
+          (MobAnimation){
+
+              .sprite = LoadTexture("resources/mob/golem/golem_death.png"),
+              .frame_count = 9,
+              .current_frame_no = 1,
+              .current_frame_rec =
+                  (Rectangle){.x = 0, .y = 0, .width = 101.5, .height = 64},
+              .time_needed = .07,
+              .time_passed = 0},
+
+      .golemr_death_back =
+          (MobAnimation){
+
+              .sprite = LoadTexture("resources/mob/golem/golem_death_back.png"),
+              .frame_count = 9,
+              .current_frame_no = 1,
+              .current_frame_rec =
+                  (Rectangle){.x = 0, .y = 0, .width = 101, .height = 64},
+              .time_needed = .07,
+              .time_passed = 0}
+
+  };
+
+  Trampoline trampoline = {
+
+      .mode = TRAMPOLINE_IDLE,
+      .width = 28,
+      .height = 28,
+      .position = (Vector2){.x = 10 * 32, .y = 15 * 32 - 28},
+      .sprite = LoadTexture("resources/traps/trampoline.png"),
+      .time_needed = 0.1,
+      .time_passed = 0,
+      .frame_count = 8,
+      .current_frame_no = 1,
+      .current_frame_rec =
+          (Rectangle){.x = 0, .y = 0, .width = 28, .height = 28},
+  };
+
   while (!WindowShouldClose()) {
+
+      if(!IsSoundPlaying(sound_nature)){
+          PlaySound(sound_nature);
+      }
+
 
     if (menu == MAIN_MENU) {
       //  Draw phase
@@ -1869,6 +2714,8 @@ int main() {
       UpdateFloaters(floaters, &player_state);
       UpdateTrap(&trap, &player_state, &death_scream);
       UpdateGolem(&golem, &player_state, &death_scream, &sound_golem_attack);
+      UpdateGolemR(&golemr, &player_state, &sound_golemr_collision);
+      UpdateTrampoline(&trampoline, &player_state);
 
       BeginDrawing();
 
@@ -1882,15 +2729,26 @@ int main() {
 
       DrawPlatform(&window, &platform, &tilemap, &player_state, floaters);
       DrawHP(&player_state);
-      DrawRectangleRec(trap.hitbox, BLUE);
-      DrawTrap(&trap);
 
+#ifdef DEBUG
+      DrawRectangleRec(trap.hitbox, BLUE);
+      DrawRectangleRec((Rectangle){.x = trampoline.position.x,
+                                   .y = trampoline.position.y + 20,
+                                   .width = 28,
+                                   .height = 8},
+                       BLUE);
+#endif
+      DrawTrap(&trap);
+      DrawTrampoline(&trampoline, &sound_spring);
+
+#ifdef DEBUG
       DrawRectangleRec(player, RED);
+#endif
 
       if (player_state.in_attack_light || IsKeyPressed(KEY_J)) {
         current_mode = ATTACK_LIGHT;
         HandleAttackLight(&player_state, &sound_attack_light, &golem,
-                          &sound_golem_hit);
+                          &sound_golem_hit, &golemr);
 
       }
 
@@ -1908,8 +2766,12 @@ int main() {
 
       if (player_state.in_jump) {
         HandleJump(animation_states, &player_state);
-        if((golem.mode != MOB_DEAD)){
-            DrawGolem(&golem, &player_state, &sound_golem_attack, &sound_golem_dead);
+        if ((golem.mode != MOB_DEAD)) {
+          DrawGolem(&golem, &player_state, &sound_golem_attack,
+                    &sound_golem_dead);
+        }
+        if ((golemr.mode != MOB_DEAD)) {
+            DrawGolemR(&golemr, &player_state, &sound_golem_dead, &sound_bullet, &sound_bullet_hit);
         }
       }
 
@@ -1949,8 +2811,13 @@ int main() {
         }
         }
 
-        if((golem.mode != MOB_DEAD)){
-            DrawGolem(&golem, &player_state, &sound_golem_attack, &sound_golem_dead);
+        if ((golem.mode != MOB_DEAD)) {
+          DrawGolem(&golem, &player_state, &sound_golem_attack,
+                    &sound_golem_dead);
+        }
+
+        if ((golemr.mode != MOB_DEAD)) {
+          DrawGolemR(&golemr, &player_state, &sound_golem_dead, &sound_bullet, &sound_bullet_hit);
         }
 
       }
@@ -1975,8 +2842,13 @@ int main() {
           DrawJumpState(animation_states, 1, &player_state);
         }
 
-        if((golem.mode != MOB_DEAD)){
-            DrawGolem(&golem, &player_state, &sound_golem_attack, &sound_golem_dead);
+        if ((golem.mode != MOB_DEAD)) {
+          DrawGolem(&golem, &player_state, &sound_golem_attack,
+                    &sound_golem_dead);
+        }
+
+        if ((golemr.mode != MOB_DEAD)) {
+            DrawGolemR(&golemr, &player_state, &sound_golem_dead, &sound_bullet, &sound_bullet_hit);
         }
       }
 
@@ -1984,7 +2856,6 @@ int main() {
       EndDrawing();
 
       if ((player_state.player->y) > (tilemap.height - 32)) {
-        PlaySound(death_scream);
         player_state.hp = 0;
         StopSound(sound_walking);
       }
@@ -1992,6 +2863,11 @@ int main() {
     }
 
     if (player_state.hp <= 0) {
+
+      if (!player_state.death_sound) {
+        PlaySound(death_scream);
+        player_state.death_sound = true;
+      }
 
       menu = DEATH_MENU;
       BeginDrawing();
@@ -2021,21 +2897,33 @@ int main() {
         menu = MAIN_MENU;
         player_state.player->y =
             1000; // not resetting y causes insta death because player is still
-               // below falling level; see below comment;
+                  // below falling level; see below comment;
+
+#ifdef DEBUG
+        player_state.player->x = 100;
+        player_state.player->y = 0;
+#endif
+
         player_state.player->x =
             0; // Need to reset all other (x,speed etc) too , but I think it
         // will be better to write a deathfunction and handle this using
         // that instead of everything else
 
+        player_state.death_sound = false;
         player_state.last_direction = 1;
         player_state.in_jump = 0;
         player_state.in_attack_light = 0;
         player_state.hp = 1;
         golem.hp = 1;
         golem.mode = MOB_WALK;
+        golemr.hp = 1;
+        golemr.mode = MOB_WALK;
+        ResetPlayerAirState(&player_state);
       }
     }
   }
+
+  StopSound(sound_nature);
 
   UnloadSound(sound_walking);
   UnloadSound(death_scream);
@@ -2045,6 +2933,10 @@ int main() {
   UnloadSound(sound_golem_attack);
   UnloadSound(sound_golem_attack);
   UnloadSound(sound_golem_dead);
+  UnloadSound(sound_golemr_collision);
+  UnloadSound(sound_bullet);
+  UnloadSound(sound_bullet_hit);
+
   CloseAudioDevice();
 
   UnloadTexture(tileset_texture);
@@ -2064,6 +2956,16 @@ int main() {
   UnloadTexture(golem.golem_run_back.sprite);
   UnloadTexture(golem.golem_attack_back.sprite);
   UnloadTexture(golem.golem_death_back.sprite);
+
+  UnloadTexture(trampoline.sprite);
+
+  UnloadTexture(golemr.golemr_walk.sprite);
+  UnloadTexture(golemr.golemr_attack.sprite);
+  UnloadTexture(golemr.golemr_bullet.sprite);
+
+  UnloadTexture(golemr.golemr_walk_back.sprite);
+  UnloadTexture(golemr.golemr_attack_back.sprite);
+  UnloadTexture(golemr.golemr_bullet_back.sprite);
 
   CloseWindow();
 }
