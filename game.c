@@ -2226,7 +2226,14 @@ void DrawGolemR(MobGolemR *golemr, PlayerState *player_state,
   }
 
   if (golemr->bullet_released && golemr->mode != MOB_IDLE) {
+
+      #ifdef DEBUG
+
     DrawRectangleRec(golemr->bullet_hitbox, YELLOW);
+
+    #endif
+
+
     UpdateBullet(golemr, player_state, sound_bullet_hit);
     DrawBullet(golemr);
   }
@@ -2240,6 +2247,9 @@ int main() {
 
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   InitWindow(window.width, window.height, "GGG");
+
+  Texture2D bg = LoadTexture("resources/bg/bg.png");
+
 
   Texture2D tileset_texture = LoadTexture("resources/tiles/Tileset.png");
 
@@ -2298,7 +2308,7 @@ int main() {
   floaters[0] = (Floater){
       .floater = (int[]){44, 45, 45, 46},
       .floater_width = 4,
-      .speed = 1.1,
+      .speed = 1.7,
       .position = (Vector2){.x = 45 * tileset.tile_width,
                             .y = 40 * tileset.tile_height},
       .type = VERTICAL,
@@ -2313,7 +2323,7 @@ int main() {
   floaters[1] =
       (Floater){.floater = (int[]){44, 45, 46},
                 .floater_width = 3,
-                .speed = 1.1,
+                .speed = 1.7,
                 .position = (Vector2){.x = 31 * tileset.tile_width,
                                       .y = 31 * tileset.tile_height},
                 .type = HORIZONTAL,
@@ -2328,7 +2338,7 @@ int main() {
   floaters[2] = (Floater){
       .floater = (int[]){44, 45, 45, 46},
       .floater_width = 4,
-      .speed = 1.1,
+      .speed = 1.9,
       .position =
           (Vector2){.x = 2 * tileset.tile_width, .y = 31 * tileset.tile_height},
       .type = VERTICAL,
@@ -2720,6 +2730,11 @@ int main() {
       BeginDrawing();
 
       BeginMode2D(camera);
+
+
+      DrawTexture(bg, 0, 0, WHITE);
+
+
 
       if (IsKeyDown(KEY_T)) {
         ToggleFullscreen();
