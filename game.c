@@ -1,7 +1,9 @@
 #include <raylib.h>
+#include<math.h>
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdio.h>
+
 
 // #define DEBUG
 
@@ -271,6 +273,34 @@ typedef struct {
   int height_trampoline[2];
 
 } Trampoline;
+
+typedef struct {
+
+  Texture2D cloud;
+  float speed;
+  Vector2 position;
+
+} Cloud;
+
+typedef struct {
+
+  Texture2D sprite;
+  int frame_count;
+  int current_frame_no;
+  Rectangle current_frame_rec;
+  float time_needed;
+  float time_passed;
+  Vector2 position;
+
+} FountainAnimation;
+
+typedef struct {
+
+  bool camera_shake;
+  float camera_shake_time;
+  Vector2 last_camera_position;
+
+} CameraState;
 
 float diff(float a, float b) { return ((a - b > 0) ? (a - b) : (b - a)); }
 
@@ -779,7 +809,7 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
 }
 
 void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
-            PlayerMode *mode) {
+            PlayerMode *mode, CameraState *camera_state) {
 
   if (IsKeyDown(KEY_A) && !player_state->in_attack_light &&
       !player_state->is_being_hit) {
@@ -824,6 +854,8 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
     player_state->gravity = 1.5;
   }
 
+#ifdef DEBUG
+
   if (IsKeyPressed(KEY_P)) {
     (camera->zoom + 0.1 <= 2) ? (camera->zoom += 0.1) : (camera->zoom);
   }
@@ -831,6 +863,8 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
   if (IsKeyPressed(KEY_M)) {
     (camera->zoom - 0.1 >= 1) ? (camera->zoom -= 0.1) : (camera->zoom);
   }
+
+#endif
 
   if (player_state->player->x < 0) {
     player_state->player->x = 0;
@@ -861,23 +895,61 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
   // if (IsKeyDown(KEY_UP)) {
   //   player_state->player->y -= player_state->speed;
   // }
+  //
+  //
+  //
 
-  if ((camera->target.x) - (GetScreenWidth() / (2.0 * camera->zoom)) <= 0) {
-    camera->target.x = camera->offset.x / (camera->zoom);
+  #ifdef DEBUG
+  if(IsKeyPressed(KEY_U)){
+      camera_state->camera_shake = true;
   }
 
-  if ((camera->target.x) + (GetScreenWidth() / (2.0 * camera->zoom)) >=
-      (tilemap->width)) {
-    camera->target.x = tilemap->width - camera->offset.x / (camera->zoom);
+  #endif
+
+  if (!camera_state ->camera_shake) {
+
+    if ((camera->target.x) - (GetScreenWidth() / (2.0 * camera->zoom)) <= 0) {
+      camera->target.x = camera->offset.x / (camera->zoom);
+    }
+
+    if ((camera->target.x) + (GetScreenWidth() / (2.0 * camera->zoom)) >=
+        (tilemap->width)) {
+      camera->target.x = tilemap->width - camera->offset.x / (camera->zoom);
+    }
+
+    if ((camera->target.y) - (GetScreenHeight() / (2.0 * camera->zoom)) <=
+        160) {
+      camera->target.y = (camera->offset.y) / (camera->zoom) + 160;
+    }
+
+    if ((camera->target.y) + (GetScreenHeight() / (2.0 * camera->zoom)) >=
+        (tilemap->height - 64)) {
+      camera->target.y =
+          tilemap->height - 64 - camera->offset.y / (camera->zoom);
+    }
+
+    camera_state ->last_camera_position = (Vector2){.x = camera->target.x, .y = camera->target.y};
   }
 
-  if ((camera->target.y) - (GetScreenHeight() / (2.0 * camera->zoom)) <= 160) {
-    camera->target.y = (camera->offset.y) / (camera->zoom) + 160;
-  }
+  else{
+      camera_state->camera_shake_time+=GetFrameTime();
 
-  if ((camera->target.y) + (GetScreenHeight() / (2.0 * camera->zoom)) >=
-      (tilemap->height - 64)) {
-    camera->target.y = tilemap->height - 64 - camera->offset.y / (camera->zoom);
+      if(camera_state ->camera_shake_time > 0.4){
+          camera_state->camera_shake_time = 0;
+          camera_state->camera_shake = false;
+      }
+
+      else{
+
+          float dx = 20 * pow(2.7, -camera_state ->camera_shake_time) * sin(40 * camera_state ->camera_shake_time);
+          float dy = 15 * pow(2.7, -camera_state ->camera_shake_time) * sin(57 * camera_state ->camera_shake_time);
+
+
+          camera->target.x = camera_state->last_camera_position.x + dx * .01;
+          camera->target.y = camera_state->last_camera_position.y + dy * .01;
+
+
+      }
   }
 }
 
@@ -1297,7 +1369,6 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
     golemr->hp -= player_state->attack_light_damage;
     player_state->is_attack_hit = 0;
     golemr->idle_buffer = .7;
-
 
     if (golemr->hp > 0) {
       PlaySound(*sound_golem_hit);
@@ -1774,7 +1845,7 @@ void UpdateTrampoline(Trampoline *trampoline, PlayerState *player_state) {
   }
 }
 
-void DrawTrampoline(Trampoline *trampoline, Sound* sound_spring) {
+void DrawTrampoline(Trampoline *trampoline, Sound *sound_spring) {
   if (trampoline->mode == TRAMPOLINE_IDLE) {
     DrawTextureRec(
         trampoline->sprite, trampoline->current_frame_rec,
@@ -1785,8 +1856,8 @@ void DrawTrampoline(Trampoline *trampoline, Sound* sound_spring) {
   if (trampoline->mode == TRAMPOLINE_ACTIVE) {
     trampoline->time_passed += GetFrameTime();
 
-    if(trampoline->current_frame_no == 1){
-       PlaySound(*sound_spring);
+    if (trampoline->current_frame_no == 1) {
+      PlaySound(*sound_spring);
     }
 
     if (trampoline->time_passed >= trampoline->time_needed) {
@@ -1811,7 +1882,8 @@ void DrawTrampoline(Trampoline *trampoline, Sound* sound_spring) {
   }
 }
 
-void UpdateGolemR(MobGolemR *golemr, PlayerState *player_state, Sound* sound_golemr_collision) {
+void UpdateGolemR(MobGolemR *golemr, PlayerState *player_state,
+                  Sound *sound_golemr_collision) {
 
   if (golemr->hp <= 0) {
     if (!(golemr->mode == MOB_DEAD)) {
@@ -1828,7 +1900,7 @@ void UpdateGolemR(MobGolemR *golemr, PlayerState *player_state, Sound* sound_gol
 
   else {
     golemr->idle_buffer = 0;
-    golemr -> mode = MOB_WALK;
+    golemr->mode = MOB_WALK;
   }
 
   if (golemr->no_damage_time > 0) {
@@ -1912,7 +1984,8 @@ void DrawGolemRHP(MobGolemR *golemr) {
   DrawRectangleRounded(hp_bar, 1, 0, color);
 }
 
-void UpdateBullet(MobGolemR *golemr, PlayerState *player_state, Sound* sound_bullet_hit) {
+void UpdateBullet(MobGolemR *golemr, PlayerState *player_state,
+                  Sound *sound_bullet_hit) {
 
   if (golemr->bullet_direction) {
 
@@ -1920,7 +1993,7 @@ void UpdateBullet(MobGolemR *golemr, PlayerState *player_state, Sound* sound_bul
       player_state->hp -= .20;
       golemr->bullet_released = false;
 
-          PlaySound(*sound_bullet_hit);
+      PlaySound(*sound_bullet_hit);
     }
 
     else if (golemr->bullet_hitbox.x >= golemr->bullet_destination.x) {
@@ -1998,7 +2071,8 @@ void DrawBullet(MobGolemR *golemr) {
 }
 
 void DrawGolemR(MobGolemR *golemr, PlayerState *player_state,
-                Sound *golemr_dead, Sound* golemr_bullet, Sound* sound_bullet_hit) {
+                Sound *golemr_dead, Sound *golemr_bullet,
+                Sound *sound_bullet_hit) {
 
   DrawGolemRHP(golemr);
 
@@ -2086,8 +2160,7 @@ void DrawGolemR(MobGolemR *golemr, PlayerState *player_state,
 
       if (golemr->golemr_attack.current_frame_no == 7) {
 
-
-          PlaySound(*golemr_bullet);
+        PlaySound(*golemr_bullet);
         golemr->bullet_released = true;
         golemr->bullet_direction = golemr->direction;
         golemr->bullet_destination =
@@ -2126,7 +2199,7 @@ void DrawGolemR(MobGolemR *golemr, PlayerState *player_state,
 
       if (golemr->golemr_attack_back.current_frame_no == 7) {
 
-          PlaySound(*golemr_bullet);
+        PlaySound(*golemr_bullet);
 
         golemr->bullet_released = true;
         golemr->bullet_direction = golemr->direction;
@@ -2227,16 +2300,51 @@ void DrawGolemR(MobGolemR *golemr, PlayerState *player_state,
 
   if (golemr->bullet_released && golemr->mode != MOB_IDLE) {
 
-      #ifdef DEBUG
+#ifdef DEBUG
 
     DrawRectangleRec(golemr->bullet_hitbox, YELLOW);
 
-    #endif
-
+#endif
 
     UpdateBullet(golemr, player_state, sound_bullet_hit);
     DrawBullet(golemr);
   }
+}
+
+void UpdateClouds(Cloud clouds[]) {
+  for (int i = 0; i < 6; i++) {
+    clouds[i].position.x += clouds[i].speed;
+
+    if (clouds[i].position.x > (50 * 32 + 10)) {
+      clouds[i].position.x = -300;
+    }
+  }
+}
+
+void DrawClouds(Cloud clouds[]) {
+  for (int i = 0; i < 6; i++) {
+    DrawTexture(clouds[i].cloud, clouds[i].position.x, clouds[i].position.y,
+                WHITE);
+  }
+}
+
+void AnimateFountain(FountainAnimation *fountain) {
+
+  fountain->time_passed += GetFrameTime();
+
+  if (fountain->time_passed >= fountain->time_needed) {
+    fountain->time_passed = 0;
+    fountain->current_frame_no++;
+  }
+
+  if (fountain->current_frame_no > fountain->frame_count) {
+    fountain->current_frame_no = 1;
+  }
+
+  fountain->current_frame_rec.x = (fountain->current_frame_no - 1) * (72);
+
+  DrawTextureRec(fountain->sprite, fountain->current_frame_rec,
+                 fountain->position, WHITE);
 }
 
 int main() {
@@ -2249,7 +2357,47 @@ int main() {
   InitWindow(window.width, window.height, "GGG");
 
   Texture2D bg = LoadTexture("resources/bg/bg.png");
+  Texture2D bg1 = LoadTexture("resources/bg/bg1.png");
 
+  Cloud clouds[6] = {
+
+      (Cloud){.cloud = LoadTexture("resources/other/clouds/cloud1.png"),
+              .position = (Vector2){.x = 100, .y = 870},
+              .speed = 0.05},
+
+      (Cloud){.cloud = LoadTexture("resources/other/clouds/cloud2.png"),
+              .position = (Vector2){.x = 700, .y = 500},
+              .speed = 0.01},
+
+      (Cloud){.cloud = LoadTexture("resources/other/clouds/cloud3.png"),
+              .position = (Vector2){.x = 100, .y = 300},
+              .speed = 0.1},
+
+      (Cloud){.cloud = LoadTexture("resources/other/clouds/cloud4.png"),
+              .position = (Vector2){.x = 0, .y = 450},
+              .speed = 0.05},
+
+      (Cloud){.cloud = LoadTexture("resources/other/clouds/cloud5.png"),
+              .position = (Vector2){.x = 600, .y = 1100},
+              .speed = 0.1},
+
+      (Cloud){.cloud = LoadTexture("resources/other/clouds/cloud6.png"),
+              .position = (Vector2){.x = 1800, .y = 300},
+              .speed = 0.2},
+
+  };
+
+  FountainAnimation fountain = (FountainAnimation){
+      .sprite = LoadTexture("resources/other/fountain/fountain.png"),
+      .frame_count = 4,
+      .time_needed = 0.1,
+      .time_passed = 0,
+      .current_frame_no = 1,
+      .current_frame_rec =
+          (Rectangle){.x = 0, .y = 0, .width = 72, .height = 72},
+      .position = (Vector2){.x = 15 * 32, .y = 39 * 32 - 72}
+
+  };
 
   Texture2D tileset_texture = LoadTexture("resources/tiles/Tileset.png");
 
@@ -2295,13 +2443,19 @@ int main() {
 
   };
 
+  CameraState camera_state = {
+
+      .camera_shake = false,
+      .camera_shake_time = 0,
+      .last_camera_position = (Vector2){.x = 0, .y = 0}};
+
   Camera2D camera = (Camera2D){
       .offset =
           (Vector2){.x = GetScreenWidth() / 2.0, .y = GetScreenHeight() / 2.0},
       .target =
           (Vector2){.x = player_state.player->x, .y = player_state.player->y},
       .rotation = 0.0,
-      .zoom = 1.5};
+      .zoom = 1.75};
 
   Floater floaters[3];
 
@@ -2359,19 +2513,20 @@ int main() {
 
   InitAudioDevice();
 
-  Sound sound_walking = LoadSound("resources/audio/running_in_grass.mp3");
-  Sound death_scream = LoadSound("resources/audio/death_scream.mp3");
-  Sound sound_jump = LoadSound("resources/audio/jump.mp3");
-  Sound sound_attack_light = LoadSound("resources/audio/attack_light.mp3");
-  Sound sound_golem_hit = LoadSound("resources/audio/golem-hit.mp3");
-  Sound sound_golem_attack = LoadSound("resources/audio/golem-attack.wav");
-  Sound sound_golem_dead = LoadSound("resources/audio/golem-dead.mp3");
-  Sound sound_golemr_collision = LoadSound("resources/audio/golemr_collision.wav");
-  Sound sound_bullet =  LoadSound("resources/audio/bullet.wav");
-  Sound sound_bullet_hit =  LoadSound("resources/audio/bullet_hit.mp3");
-  Sound sound_spring=  LoadSound("resources/audio/spring.mp3");
-  Sound sound_nature=  LoadSound("resources/audio/nature.mp3");
-  SetTargetFPS(window.fps);
+    Sound sound_walking = LoadSound("resources/audio/running_in_grass.mp3");
+    Sound death_scream = LoadSound("resources/audio/death_scream.mp3");
+    Sound sound_jump = LoadSound("resources/audio/jump.mp3");
+    Sound sound_attack_light = LoadSound("resources/audio/attack_light.mp3");
+    Sound sound_golem_hit = LoadSound("resources/audio/golem-hit.mp3");
+    Sound sound_golem_attack = LoadSound("resources/audio/golem-attack.wav");
+    Sound sound_golem_dead = LoadSound("resources/audio/golem-dead.mp3");
+    Sound sound_golemr_collision =
+        LoadSound("resources/audio/golemr_collision.wav");
+    Sound sound_bullet = LoadSound("resources/audio/bullet.wav");
+    Sound sound_bullet_hit = LoadSound("resources/audio/bullet_hit.mp3");
+    Sound sound_spring = LoadSound("resources/audio/spring.mp3");
+    Sound sound_nature = LoadSound("resources/audio/nature.mp3");
+    SetTargetFPS(window.fps);
 
   Trap trap = (Trap){
 
@@ -2665,11 +2820,6 @@ int main() {
 
   while (!WindowShouldClose()) {
 
-      if(!IsSoundPlaying(sound_nature)){
-          PlaySound(sound_nature);
-      }
-
-
     if (menu == MAIN_MENU) {
       //  Draw phase
       BeginDrawing();
@@ -2720,21 +2870,26 @@ int main() {
     }
     if (menu == GAME_MENU) {
 
-      Update(&player_state, &camera, &tilemap, &current_mode);
+      if (!IsSoundPlaying(sound_nature)) {
+        PlaySound(sound_nature);
+      }
+
+      Update(&player_state, &camera, &tilemap, &current_mode, &camera_state);
       UpdateFloaters(floaters, &player_state);
       UpdateTrap(&trap, &player_state, &death_scream);
       UpdateGolem(&golem, &player_state, &death_scream, &sound_golem_attack);
       UpdateGolemR(&golemr, &player_state, &sound_golemr_collision);
       UpdateTrampoline(&trampoline, &player_state);
+      UpdateClouds(clouds);
 
       BeginDrawing();
 
       BeginMode2D(camera);
 
-
       DrawTexture(bg, 0, 0, WHITE);
-
-
+      DrawClouds(clouds);
+      DrawTexture(bg1, 0, 0, WHITE);
+      AnimateFountain(&fountain);
 
       if (IsKeyDown(KEY_T)) {
         ToggleFullscreen();
@@ -2786,7 +2941,8 @@ int main() {
                     &sound_golem_dead);
         }
         if ((golemr.mode != MOB_DEAD)) {
-            DrawGolemR(&golemr, &player_state, &sound_golem_dead, &sound_bullet, &sound_bullet_hit);
+          DrawGolemR(&golemr, &player_state, &sound_golem_dead, &sound_bullet,
+                     &sound_bullet_hit);
         }
       }
 
@@ -2832,7 +2988,8 @@ int main() {
         }
 
         if ((golemr.mode != MOB_DEAD)) {
-          DrawGolemR(&golemr, &player_state, &sound_golem_dead, &sound_bullet, &sound_bullet_hit);
+          DrawGolemR(&golemr, &player_state, &sound_golem_dead, &sound_bullet,
+                     &sound_bullet_hit);
         }
 
       }
@@ -2863,7 +3020,8 @@ int main() {
         }
 
         if ((golemr.mode != MOB_DEAD)) {
-            DrawGolemR(&golemr, &player_state, &sound_golem_dead, &sound_bullet, &sound_bullet_hit);
+          DrawGolemR(&golemr, &player_state, &sound_golem_dead, &sound_bullet,
+                     &sound_bullet_hit);
         }
       }
 
@@ -2955,8 +3113,13 @@ int main() {
   CloseAudioDevice();
 
   UnloadTexture(tileset_texture);
+  UnloadTexture(bg);
+  UnloadTexture(bg1);
   for (int i = 0; i < animation_states_count; i++) {
     UnloadTexture(animation_states[i].sprite.sheet);
+  }
+  for (int i = 0; i < 6; i++) {
+    UnloadTexture(clouds[i].cloud);
   }
 
   UnloadTexture(player_state.attack_light_sprite);
