@@ -1,9 +1,7 @@
 #include <raylib.h>
-#include<math.h>
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdio.h>
-
 
 // #define DEBUG
 
@@ -46,9 +44,12 @@ typedef struct {
 
   Rectangle *player;
   Rectangle attack_light_current_frame_rec;
+  Rectangle attack_heavy_current_frame_rec;
 
   int attack_light_frame_count;
+  int attack_heavy_frame_count;
   int attack_light_current_frame_no;
+  int attack_heavy_current_frame_no;
   int jump_left;
 
   float speed;
@@ -63,16 +64,23 @@ typedef struct {
   float attack_light_time_passed;
   float attack_light_time_needed;
 
+  float attack_heavy_damage;
+  float attack_heavy_time_passed;
+  float attack_heavy_time_needed;
+
   bool is_grounded;
   bool in_jump;
   bool last_direction;
   bool is_attack_hit;
   bool in_attack_light;
+  bool in_attack_heavy;
   bool is_being_hit;
   bool death_sound;
 
   Texture2D attack_light_sprite;
   Texture2D attack_light_sprite_back;
+  Texture2D attack_heavy_sprite;
+  Texture2D attack_heavy_sprite_back;
 
 } PlayerState;
 
@@ -91,7 +99,8 @@ typedef enum {
   RUN_LEFT,
   JUMP,
   JUMP_LEFT,
-  ATTACK_LIGHT
+  ATTACK_LIGHT,
+  ATTACK_HEAVY
 } PlayerMode;
 
 typedef struct {
@@ -293,14 +302,6 @@ typedef struct {
   Vector2 position;
 
 } FountainAnimation;
-
-typedef struct {
-
-  bool camera_shake;
-  float camera_shake_time;
-  Vector2 last_camera_position;
-
-} CameraState;
 
 float diff(float a, float b) { return ((a - b > 0) ? (a - b) : (b - a)); }
 
@@ -809,10 +810,10 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
 }
 
 void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
-            PlayerMode *mode, CameraState *camera_state) {
+            PlayerMode *mode) {
 
   if (IsKeyDown(KEY_A) && !player_state->in_attack_light &&
-      !player_state->is_being_hit) {
+      !player_state->in_attack_heavy && !player_state->is_being_hit) {
 
     player_state->last_direction = 0;
 
@@ -828,7 +829,7 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
   }
 
   else if (IsKeyDown(KEY_D) && !player_state->in_attack_light &&
-           !player_state->is_being_hit) {
+           !player_state->in_attack_heavy && !player_state->is_being_hit) {
     player_state->last_direction = 1;
 
     if (player_state->is_grounded) {
@@ -846,7 +847,7 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
   }
 
   if (!player_state->is_grounded && IsKeyDown(KEY_S) &&
-      !player_state->in_attack_light) {
+      !player_state->in_attack_light && !player_state->in_attack_heavy) {
     player_state->gravity *= 1.5;
   }
 
@@ -899,57 +900,22 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
   //
   //
 
-  #ifdef DEBUG
-  if(IsKeyPressed(KEY_U)){
-      camera_state->camera_shake = true;
+  if ((camera->target.x) - (GetScreenWidth() / (2.0 * camera->zoom)) <= 0) {
+    camera->target.x = camera->offset.x / (camera->zoom);
   }
 
-  #endif
-
-  if (!camera_state ->camera_shake) {
-
-    if ((camera->target.x) - (GetScreenWidth() / (2.0 * camera->zoom)) <= 0) {
-      camera->target.x = camera->offset.x / (camera->zoom);
-    }
-
-    if ((camera->target.x) + (GetScreenWidth() / (2.0 * camera->zoom)) >=
-        (tilemap->width)) {
-      camera->target.x = tilemap->width - camera->offset.x / (camera->zoom);
-    }
-
-    if ((camera->target.y) - (GetScreenHeight() / (2.0 * camera->zoom)) <=
-        160) {
-      camera->target.y = (camera->offset.y) / (camera->zoom) + 160;
-    }
-
-    if ((camera->target.y) + (GetScreenHeight() / (2.0 * camera->zoom)) >=
-        (tilemap->height - 64)) {
-      camera->target.y =
-          tilemap->height - 64 - camera->offset.y / (camera->zoom);
-    }
-
-    camera_state ->last_camera_position = (Vector2){.x = camera->target.x, .y = camera->target.y};
+  if ((camera->target.x) + (GetScreenWidth() / (2.0 * camera->zoom)) >=
+      (tilemap->width)) {
+    camera->target.x = tilemap->width - camera->offset.x / (camera->zoom);
   }
 
-  else{
-      camera_state->camera_shake_time+=GetFrameTime();
+  if ((camera->target.y) - (GetScreenHeight() / (2.0 * camera->zoom)) <= 200) {
+    camera->target.y = (camera->offset.y) / (camera->zoom) + 200;
+  }
 
-      if(camera_state ->camera_shake_time > 0.4){
-          camera_state->camera_shake_time = 0;
-          camera_state->camera_shake = false;
-      }
-
-      else{
-
-          float dx = 20 * pow(2.7, -camera_state ->camera_shake_time) * sin(40 * camera_state ->camera_shake_time);
-          float dy = 15 * pow(2.7, -camera_state ->camera_shake_time) * sin(57 * camera_state ->camera_shake_time);
-
-
-          camera->target.x = camera_state->last_camera_position.x + dx * .01;
-          camera->target.y = camera_state->last_camera_position.y + dy * .01;
-
-
-      }
+  if ((camera->target.y) + (GetScreenHeight() / (2.0 * camera->zoom)) >=
+      (tilemap->height - 64)) {
+    camera->target.y = tilemap->height - 64 - camera->offset.y / (camera->zoom);
   }
 }
 
@@ -1106,7 +1072,9 @@ void DrawJumpState(AnimationState animation_states[], int frame_no,
 
 void HandleJump(AnimationState animation_states[], PlayerState *player_state) {
 
-  DrawJumpState(animation_states, 1, player_state);
+  if (!player_state->in_attack_light && !player_state->in_attack_heavy) {
+    DrawJumpState(animation_states, 1, player_state);
+  }
 
   if (player_state->rising_speed > 0) {
     player_state->air_time_passed += GetFrameTime();
@@ -1271,10 +1239,11 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
                        MobGolemR *golemr) {
 
   if (player_state->is_being_hit) {
+      player_state->in_attack_light = false;
+      player_state->attack_light_current_frame_no = 1;
+      player_state->attack_light_time_passed = 0;
     return;
   }
-
-  player_state->in_attack_light = true;
 
   player_state->attack_light_time_passed += GetFrameTime();
 
@@ -1289,11 +1258,16 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
     player_state->attack_light_current_frame_no = 1;
 
     player_state->in_attack_light = false;
+    player_state->in_attack_heavy = false;
     player_state->is_attack_hit = 1;
     return;
   }
 
-  if (player_state->attack_light_current_frame_no == 1) {
+  if (player_state->attack_light_current_frame_no == 2) {
+    PlaySound(*sound_attack_light);
+  }
+  if (player_state->attack_light_current_frame_no == 11) {
+    StopSound(*sound_attack_light);
     PlaySound(*sound_attack_light);
   }
 
@@ -1381,6 +1355,138 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
   // }
 }
 
+void HandleAttackHeavy(PlayerState *player_state, Sound *sound_attack_heavy,
+                       MobGolem *golem, Sound *sound_golem_hit,
+                       MobGolemR *golemr) {
+
+  if (player_state->is_being_hit) {
+      player_state->in_attack_heavy = false;
+      player_state->attack_heavy_current_frame_no = 1;
+      player_state->attack_heavy_time_passed = 0;
+    return;
+  }
+
+  player_state->attack_heavy_time_passed += GetFrameTime();
+
+  if (player_state->attack_heavy_time_passed >=
+      player_state->attack_heavy_time_needed) {
+    player_state->attack_heavy_current_frame_no++;
+    player_state->attack_heavy_time_passed = 0;
+  }
+
+  if (player_state->attack_heavy_current_frame_no >
+      player_state->attack_heavy_frame_count) {
+    player_state->attack_heavy_current_frame_no = 1;
+
+    player_state->in_attack_heavy = false;
+    player_state->in_attack_light = false;
+    player_state->is_attack_hit = 1;
+    return;
+  }
+
+  if (player_state->attack_heavy_current_frame_no == 9) {
+    PlaySound(*sound_attack_heavy);
+  }
+
+  player_state->attack_heavy_current_frame_rec.x =
+      (player_state->attack_heavy_current_frame_no - 1) *
+      player_state->attack_heavy_current_frame_rec.width;
+
+  Rectangle hitbox;
+
+  if (player_state->last_direction) {
+
+    hitbox = (Rectangle){.x = player_state->player->x,
+                         .y = player_state->player->y,
+                         .width = 150,
+                         .height = 64};
+
+#ifdef DEBUG
+    DrawRectangleRec(hitbox, GREEN);
+
+    DrawRectangle(player_state->player->x, player_state->player->y, 32, 64,
+                  RED);
+
+#endif
+
+    DrawTextureRec(player_state->attack_heavy_sprite,
+                   player_state->attack_heavy_current_frame_rec,
+                   (Vector2){.x = player_state->player->x - 85,
+                             .y = player_state->player->y - 127},
+                   WHITE);
+  }
+
+  else {
+
+    hitbox = (Rectangle){.x = player_state->player->x - 150 +
+                              player_state->player->width,
+                         .y = player_state->player->y,
+                         .width = 150,
+                         .height = 64};
+#ifdef DEBUG
+    DrawRectangleRec(hitbox, GREEN);
+
+    DrawRectangle(player_state->player->x, player_state->player->y, 32, 64,
+                  RED);
+#endif
+
+    DrawTextureRec(player_state->attack_heavy_sprite_back,
+                   player_state->attack_heavy_current_frame_rec,
+                   (Vector2){.x = player_state->player->x - 85 - 150 -
+                                  player_state->player->width,
+                             .y = player_state->player->y - 127},
+                   WHITE);
+  }
+
+  if (SimpleCollisionCheck(&hitbox, &golem->hurtbox)) {
+    golem->idle_buffer = .1;
+
+    if (player_state->player->x >= golem->hurtbox.x) {
+      golem->direction = 1;
+    } else {
+      golem->direction = 0;
+    }
+  }
+
+  if (player_state->is_attack_hit &&
+      SimpleCollisionCheck(&hitbox, &golem->hurtbox) &&
+      player_state->attack_heavy_current_frame_no >= 9) {
+    golem->hp -= player_state->attack_heavy_damage;
+    player_state->is_attack_hit = 0;
+    golem->idle_buffer = .1;
+
+    if (player_state->player->x >= golem->hurtbox.x) {
+      golem->direction = 1;
+    } else {
+      golem->direction = 0;
+    }
+
+    if (golem->hp > 0) {
+      PlaySound(*sound_golem_hit);
+    }
+  }
+
+  if (SimpleCollisionCheck(&hitbox, &golemr->hurtbox)) {
+    golemr->idle_buffer = .1;
+  }
+
+  if (player_state->is_attack_hit &&
+      SimpleCollisionCheck(&hitbox, &golemr->hurtbox) &&
+      player_state->attack_heavy_current_frame_no >= 9) {
+    golemr->hp -= player_state->attack_heavy_damage;
+    player_state->is_attack_hit = 0;
+    golemr->idle_buffer = .1;
+
+    if (golemr->hp > 0) {
+      PlaySound(*sound_golem_hit);
+    }
+  }
+
+  // if (golem->hp > 0) {
+  //   PlaySound(*sound_golem_hit);
+  // }
+  // }
+}
 void UpdateGolem(MobGolem *golem, PlayerState *player_state,
                  Sound *death_scream, Sound *golem_attack) {
 
@@ -1405,7 +1511,9 @@ void UpdateGolem(MobGolem *golem, PlayerState *player_state,
 
   if ((golem->mode == MOB_ATTACK ||
        SimpleCollisionCheck(&golem->hurtbox, player_state->player)) &&
-      (!player_state->in_attack_light)) {
+      (!player_state->in_attack_light)
+
+  ) {
 
     golem->mode = MOB_ATTACK;
     player_state->is_being_hit = true;
@@ -1565,7 +1673,7 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state, Sound *golem_attack,
           golem->golem_attack.frame_count) {
         golem->golem_attack.current_frame_no = 1;
         golem->mode = MOB_IDLE;
-        golem->idle_buffer = .5;
+        golem->idle_buffer = .1;
         player_state->is_being_hit = false;
         player_state->hp -= golem->damage;
 
@@ -1600,7 +1708,7 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state, Sound *golem_attack,
           golem->golem_attack_back.frame_count) {
         golem->golem_attack_back.current_frame_no = 1;
         golem->mode = MOB_IDLE;
-        golem->idle_buffer = .5;
+        golem->idle_buffer = .1;
         player_state->is_being_hit = false;
         player_state->hp -= golem->damage;
 
@@ -1912,7 +2020,7 @@ void UpdateGolemR(MobGolemR *golemr, PlayerState *player_state,
   if (SimpleCollisionResolver(player_state->player, &golemr->hurtbox,
                               player_state)) {
     if (golemr->no_damage_time == 0) {
-      player_state->hp -= 0.5;
+      player_state->hp -= 0.1;
       golemr->no_damage_time = 1;
 
       PlaySound(*sound_golemr_collision);
@@ -2427,8 +2535,9 @@ int main() {
       .last_direction = 1,
       .hp = 1,
       .in_attack_light = false,
+      .in_attack_heavy = false,
       .is_attack_hit = 1,
-      .attack_light_damage = 0.4,
+      .attack_light_damage = 0.1,
       .attack_light_time_needed = 0.05,
       .attack_light_time_passed = 0,
       .attack_light_frame_count = 15,
@@ -2438,16 +2547,22 @@ int main() {
       .attack_light_sprite = LoadTexture("resources/hero/hero-attack.png"),
       .attack_light_sprite_back =
           LoadTexture("resources/hero/hero-attack-back.png"),
+
+      .attack_heavy_damage = 0.3,
+      .attack_heavy_time_needed = 0.08,
+      .attack_heavy_time_passed = 0,
+      .attack_heavy_frame_count = 13,
+      .attack_heavy_current_frame_no = 1,
+      .attack_heavy_current_frame_rec =
+          (Rectangle){.width = 384, .height = 192, .x = 0, .y = 0},
+      .attack_heavy_sprite =
+          LoadTexture("resources/hero/hero-attack-heavy.png"),
+      .attack_heavy_sprite_back =
+          LoadTexture("resources/hero/hero-attack-heavy-back.png"),
       .is_being_hit = false,
       .death_sound = false
 
   };
-
-  CameraState camera_state = {
-
-      .camera_shake = false,
-      .camera_shake_time = 0,
-      .last_camera_position = (Vector2){.x = 0, .y = 0}};
 
   Camera2D camera = (Camera2D){
       .offset =
@@ -2513,20 +2628,21 @@ int main() {
 
   InitAudioDevice();
 
-    Sound sound_walking = LoadSound("resources/audio/running_in_grass.mp3");
-    Sound death_scream = LoadSound("resources/audio/death_scream.mp3");
-    Sound sound_jump = LoadSound("resources/audio/jump.mp3");
-    Sound sound_attack_light = LoadSound("resources/audio/attack_light.mp3");
-    Sound sound_golem_hit = LoadSound("resources/audio/golem-hit.mp3");
-    Sound sound_golem_attack = LoadSound("resources/audio/golem-attack.wav");
-    Sound sound_golem_dead = LoadSound("resources/audio/golem-dead.mp3");
-    Sound sound_golemr_collision =
-        LoadSound("resources/audio/golemr_collision.wav");
-    Sound sound_bullet = LoadSound("resources/audio/bullet.wav");
-    Sound sound_bullet_hit = LoadSound("resources/audio/bullet_hit.mp3");
-    Sound sound_spring = LoadSound("resources/audio/spring.mp3");
-    Sound sound_nature = LoadSound("resources/audio/nature.mp3");
-    SetTargetFPS(window.fps);
+  Sound sound_walking = LoadSound("resources/audio/running_in_grass.mp3");
+  Sound death_scream = LoadSound("resources/audio/death_scream.mp3");
+  Sound sound_jump = LoadSound("resources/audio/jump.mp3");
+  Sound sound_attack_light = LoadSound("resources/audio/attack_light.mp3");
+  Sound sound_attack_heavy = LoadSound("resources/audio/attack_heavy.wav");
+  Sound sound_golem_hit = LoadSound("resources/audio/golem-hit.mp3");
+  Sound sound_golem_attack = LoadSound("resources/audio/golem-attack.wav");
+  Sound sound_golem_dead = LoadSound("resources/audio/golem-dead.mp3");
+  Sound sound_golemr_collision =
+      LoadSound("resources/audio/golemr_collision.wav");
+  Sound sound_bullet = LoadSound("resources/audio/bullet.wav");
+  Sound sound_bullet_hit = LoadSound("resources/audio/bullet_hit.mp3");
+  Sound sound_spring = LoadSound("resources/audio/spring.mp3");
+  Sound sound_nature = LoadSound("resources/audio/nature.mp3");
+  SetTargetFPS(window.fps);
 
   Trap trap = (Trap){
 
@@ -2569,13 +2685,13 @@ int main() {
 
       .mode = MOB_WALK,
       .hp = 1,
-      .hurtbox = (Rectangle){.x = 12 * tilemap.tileset->tile_width,
+      .hurtbox = (Rectangle){.x = 11 * tilemap.tileset->tile_width,
                              .y = 21 * tilemap.tileset->tile_height + 24,
                              .width = 40,
                              .height = 40},
       .lower_bound = (Vector2){.x = 11 * tilemap.tileset->tile_width,
                                .y = 21 * tilemap.tileset->tile_height + 24},
-      .upper_bound = (Vector2){.x = 21 * tilemap.tileset->tile_width,
+      .upper_bound = (Vector2){.x = 22 * tilemap.tileset->tile_width,
                                .y = 21 * tilemap.tileset->tile_height + 24},
 
       .damage = 0.35,
@@ -2698,7 +2814,7 @@ int main() {
 
       .damage = 0.45,
       .walk_speed = 1,
-      .bullet_speed = 9,
+      .bullet_speed = 12,
       .idle_buffer = 0,
       .no_damage_time = 0,
 
@@ -2820,6 +2936,10 @@ int main() {
 
   while (!WindowShouldClose()) {
 
+#ifdef DEBUG
+    printf("is_being_hit: %d + in_attack_light: %d\n", player_state.is_being_hit, player_state.in_attack_light);
+#endif
+
     if (menu == MAIN_MENU) {
       //  Draw phase
       BeginDrawing();
@@ -2874,7 +2994,7 @@ int main() {
         PlaySound(sound_nature);
       }
 
-      Update(&player_state, &camera, &tilemap, &current_mode, &camera_state);
+      Update(&player_state, &camera, &tilemap, &current_mode);
       UpdateFloaters(floaters, &player_state);
       UpdateTrap(&trap, &player_state, &death_scream);
       UpdateGolem(&golem, &player_state, &death_scream, &sound_golem_attack);
@@ -2915,11 +3035,21 @@ int main() {
       DrawRectangleRec(player, RED);
 #endif
 
-      if (player_state.in_attack_light || IsKeyPressed(KEY_J)) {
+      if ((!player_state.in_attack_heavy) &&
+          (player_state.in_attack_light || IsKeyPressed(KEY_J))) {
         current_mode = ATTACK_LIGHT;
+        player_state.in_attack_light = true;
         HandleAttackLight(&player_state, &sound_attack_light, &golem,
                           &sound_golem_hit, &golemr);
 
+      }
+
+      else if ((!player_state.in_attack_light) &&
+               (player_state.in_attack_heavy || IsKeyPressed(KEY_K))) {
+        current_mode = ATTACK_HEAVY;
+        player_state.in_attack_heavy = true;
+        HandleAttackHeavy(&player_state, &sound_attack_heavy, &golem,
+                          &sound_golem_hit, &golemr);
       }
 
       else if (IsKeyPressed(KEY_SPACE) && !player_state.is_being_hit &&
@@ -3010,7 +3140,7 @@ int main() {
 
         player_state.player->y += player_state.falling_speed;
 
-        if (!player_state.in_attack_light) {
+        if (!player_state.in_attack_light && !player_state.in_attack_heavy) {
           DrawJumpState(animation_states, 1, &player_state);
         }
 
@@ -3086,6 +3216,7 @@ int main() {
         player_state.last_direction = 1;
         player_state.in_jump = 0;
         player_state.in_attack_light = 0;
+        player_state.in_attack_heavy = 0;
         player_state.hp = 1;
         golem.hp = 1;
         golem.mode = MOB_WALK;
@@ -3102,6 +3233,7 @@ int main() {
   UnloadSound(death_scream);
   UnloadSound(sound_jump);
   UnloadSound(sound_attack_light);
+  UnloadSound(sound_attack_heavy);
   UnloadSound(sound_golem_hit);
   UnloadSound(sound_golem_attack);
   UnloadSound(sound_golem_attack);
