@@ -1,9 +1,10 @@
+#include <math.h>
 #include <raylib.h>
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdio.h>
 
-// #define DEBUG
+#define DEBUG
 
 typedef enum { MAIN_MENU, GAME_MENU, DEATH_MENU } Menus;
 
@@ -67,6 +68,7 @@ typedef struct {
   float attack_heavy_damage;
   float attack_heavy_time_passed;
   float attack_heavy_time_needed;
+  float camera_shake_time;
 
   bool is_grounded;
   bool in_jump;
@@ -76,6 +78,7 @@ typedef struct {
   bool in_attack_heavy;
   bool is_being_hit;
   bool death_sound;
+  bool camera_shake;
 
   Texture2D attack_light_sprite;
   Texture2D attack_light_sprite_back;
@@ -649,8 +652,13 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  6,  7,  7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  6,
-      7,  7,  7,  7,  7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  6,  7,  7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  6,  7,  7,  7,  7,  7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -671,31 +679,12 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  6,  7,  7,  7,  7,  7,  7,  7,  7,
-      7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  6,  7,  7,  7,  7,
-      7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  6,  7,  7,  7,  7,  7,  7,  7,  7,  7,  8,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  6,  7,  7,  7,  7,  7,  7,  7,
-      7,  7,  7,  7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  6,  7,  7,  7,  7,  8,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      7,  7,  7,  7,  7,  7,  7,  7,  2,  2,  2,  2,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -716,31 +705,61 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  1,  2,  2,  2,  2,  2,  3,  0,  0,  0,  0,  0,  71, 11, 10, 10, 12,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  65, 24, 37,
-      37, 37, 37, 66, 0,  0,  0,  0,  0,  65, 4,  4,  4,  62, 0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  34, 11,
-      33, 2,  34, 10, 11, 33, 2,  2,  2,  2,  34, 37, 24, 24, 15, 14, 37, 64,
-      0,  0,  0,  0,  0,  65, 4,  4,  37, 62, 0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  40, 4,  4,  15, 4,  4,
-      4,  4,  14, 14, 14, 15, 4,  15, 37, 14, 4,  4,  14, 62, 0,  0,  0,  0,
-      0,  65, 4,  4,  4,  35, 33, 34, 10, 10, 33, 2,  2,  34, 10, 33, 2,  2,
-      3,  0,  0,  0,  0,  0,  0,  0,  4,  4,  4,  4,  4,  39, 4,  4,  4,  4,
-      4,  4,  4,  4,  15, 4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  53, 4,  4,
-      4,  4,  4,  4,  4,  4,  4,  14, 15, 4,  4,  4,  14, 15, 66, 0,  0,  0,
-      0,  0,  0,  0,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
-      4,  4,  4,  40, 4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  4,  4,  4,
-      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  64, 0,  0,  0,  0,  0,  0,  0,
-      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  40, 4,  4,  4,  4,  4,  4,  4,
-      4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
-      4,  4,  4,  4,  4,  4,  35, 10, 10, 11, 11, 11, 10, 10, 0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  62, 0,  0,
-      0,  0,  0,  61, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  62, 0,  0,  0,  0,  0,  61,
+      0,  6,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  7,  8,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  6,  7,  7,  7,  7,  8,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0};
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  1,  2,  2,  2,  2,  2,  3,  0,  0,  0,  0,  0,  71, 11,
+      10, 10, 12, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  65, 24, 37, 37, 37, 37, 66, 0,  0,  0,  0,  0,
+      65, 4,  4,  4,  62, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  10, 10, 33, 34, 11, 33, 2,  34,
+      10, 11, 33, 2,  2,  2,  2,  34, 37, 24, 24, 15, 14, 37, 64, 0,  0,  0,
+      0,  0,  65, 4,  4,  37, 62, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  4,  4,  4,  40, 4,  4,
+      15, 4,  4,  4,  4,  14, 14, 14, 15, 4,  15, 37, 14, 4,  4,  14, 62, 0,
+      0,  0,  0,  0,  65, 4,  4,  4,  35, 33, 34, 10, 10, 33, 2,  2,  34, 10,
+      33, 2,  2,  3,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  4,  4,  4,  4,
+      4,  4,  4,  4,  39, 4,  4,  4,  4,  4,  4,  4,  4,  15, 4,  4,  4,  4,
+      62, 0,  0,  0,  0,  0,  53, 4,  4,  4,  4,  4,  4,  4,  4,  4,  14, 15,
+      4,  4,  4,  14, 15, 66, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      40, 4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  64, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  40, 4,  4,  4,  4,
+      4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  35, 10, 10, 11, 11, 11, 10, 10, 11,
+      11, 10, 4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4};
 
   Rectangle current_tile =
       (Rectangle){.x = 0, .y = 0, .width = 32, .height = 32};
@@ -867,13 +886,14 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
 
 #endif
 
-  if (player_state->player->x < 0) {
-    player_state->player->x = 0;
+  if (player_state->player->x < (3 * 32)) {
+    player_state->player->x = (3 * 32);
   }
 
   if (player_state->player->x >
-      (tilemap->width - player_state->player->width + 15)) {
-    player_state->player->x = tilemap->width - player_state->player->width + 15;
+      (tilemap->width - (3 * 32) - player_state->player->width + 15)) {
+    player_state->player->x =
+        tilemap->width - (3 * 32) - player_state->player->width + 15;
   }
 
   if (player_state->player->y < 0) {
@@ -896,17 +916,37 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
   // if (IsKeyDown(KEY_UP)) {
   //   player_state->player->y -= player_state->speed;
   // }
-  //
-  //
-  //
 
-  if ((camera->target.x) - (GetScreenWidth() / (2.0 * camera->zoom)) <= 0) {
-    camera->target.x = camera->offset.x / (camera->zoom);
+#ifdef DEBUG
+  if (IsKeyPressed(KEY_U)) {
+    player_state->camera_shake = true;
+  }
+#endif
+
+  float dx = 20 * exp(-3 * player_state->camera_shake_time) *
+             sin(40 * player_state->camera_shake_time) * .7;
+  float dy = 15 * exp(-3 * player_state->camera_shake_time) *
+             sin(57 * player_state->camera_shake_time) * .7;
+
+  if (player_state->camera_shake) {
+
+    player_state->camera_shake_time += GetFrameTime();
+
+    if (player_state->camera_shake_time >= 0.2) {
+      player_state->camera_shake = false;
+      player_state->camera_shake_time = 0;
+    }
+  }
+
+  if ((camera->target.x) - (GetScreenWidth() / (2.0 * camera->zoom)) <=
+      (3 * 32)) {
+    camera->target.x = camera->offset.x / (camera->zoom) + 3 * 32;
   }
 
   if ((camera->target.x) + (GetScreenWidth() / (2.0 * camera->zoom)) >=
-      (tilemap->width)) {
-    camera->target.x = tilemap->width - camera->offset.x / (camera->zoom);
+      (tilemap->width - 3 * 32)) {
+    camera->target.x =
+        tilemap->width - camera->offset.x / (camera->zoom) - (3 * 32);
   }
 
   if ((camera->target.y) - (GetScreenHeight() / (2.0 * camera->zoom)) <= 200) {
@@ -915,7 +955,13 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
 
   if ((camera->target.y) + (GetScreenHeight() / (2.0 * camera->zoom)) >=
       (tilemap->height - 64)) {
-    camera->target.y = tilemap->height - 64 - camera->offset.y / (camera->zoom);
+    camera->target.y =
+        (tilemap->height - 64) - (camera->offset.y / (camera->zoom));
+  }
+
+  if (player_state->camera_shake) {
+    camera->target.x += dx;
+    camera->target.y += dy;
   }
 }
 
@@ -1239,9 +1285,9 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
                        MobGolemR *golemr) {
 
   if (player_state->is_being_hit) {
-      player_state->in_attack_light = false;
-      player_state->attack_light_current_frame_no = 1;
-      player_state->attack_light_time_passed = 0;
+    player_state->in_attack_light = false;
+    player_state->attack_light_current_frame_no = 1;
+    player_state->attack_light_time_passed = 0;
     return;
   }
 
@@ -1346,6 +1392,7 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
 
     if (golemr->hp > 0) {
       PlaySound(*sound_golem_hit);
+
     }
   }
 
@@ -1360,9 +1407,9 @@ void HandleAttackHeavy(PlayerState *player_state, Sound *sound_attack_heavy,
                        MobGolemR *golemr) {
 
   if (player_state->is_being_hit) {
-      player_state->in_attack_heavy = false;
-      player_state->attack_heavy_current_frame_no = 1;
-      player_state->attack_heavy_time_passed = 0;
+    player_state->in_attack_heavy = false;
+    player_state->attack_heavy_current_frame_no = 1;
+    player_state->attack_heavy_time_passed = 0;
     return;
   }
 
@@ -1667,6 +1714,7 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state, Sound *golem_attack,
 
       if (golem->golem_attack.current_frame_no == 4) {
         PlaySound(*golem_attack);
+        player_state->camera_shake = true;
       }
 
       if (golem->golem_attack.current_frame_no >
@@ -1702,6 +1750,7 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state, Sound *golem_attack,
 
       if (golem->golem_attack_back.current_frame_no == 4) {
         PlaySound(*golem_attack);
+        player_state->camera_shake = true;
       }
 
       if (golem->golem_attack_back.current_frame_no >
@@ -2024,6 +2073,7 @@ void UpdateGolemR(MobGolemR *golemr, PlayerState *player_state,
       golemr->no_damage_time = 1;
 
       PlaySound(*sound_golemr_collision);
+      player_state->camera_shake = true;
     }
   };
 
@@ -2102,6 +2152,7 @@ void UpdateBullet(MobGolemR *golemr, PlayerState *player_state,
       golemr->bullet_released = false;
 
       PlaySound(*sound_bullet_hit);
+      player_state->camera_shake = true;
     }
 
     else if (golemr->bullet_hitbox.x >= golemr->bullet_destination.x) {
@@ -2117,7 +2168,9 @@ void UpdateBullet(MobGolemR *golemr, PlayerState *player_state,
     if (SimpleCollisionCheck(player_state->player, &golemr->bullet_hitbox)) {
       player_state->hp -= .20;
       golemr->bullet_released = false;
+
       PlaySound(*sound_bullet_hit);
+      player_state->camera_shake = true;
     }
 
     else if (golemr->bullet_hitbox.x <= golemr->bullet_destination.x) {
@@ -2464,33 +2517,32 @@ int main() {
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   InitWindow(window.width, window.height, "GGG");
 
-  Texture2D bg = LoadTexture("resources/bg/bg.png");
   Texture2D bg1 = LoadTexture("resources/bg/bg1.png");
 
   Cloud clouds[6] = {
 
       (Cloud){.cloud = LoadTexture("resources/other/clouds/cloud1.png"),
-              .position = (Vector2){.x = 100, .y = 870},
+              .position = (Vector2){.x = 100 + 3 * 32, .y = 870},
               .speed = 0.05},
 
       (Cloud){.cloud = LoadTexture("resources/other/clouds/cloud2.png"),
-              .position = (Vector2){.x = 700, .y = 500},
+              .position = (Vector2){.x = 700 + 3 * 32, .y = 500},
               .speed = 0.01},
 
       (Cloud){.cloud = LoadTexture("resources/other/clouds/cloud3.png"),
-              .position = (Vector2){.x = 100, .y = 300},
+              .position = (Vector2){.x = 100 + 3 * 32, .y = 300},
               .speed = 0.1},
 
       (Cloud){.cloud = LoadTexture("resources/other/clouds/cloud4.png"),
-              .position = (Vector2){.x = 0, .y = 450},
+              .position = (Vector2){.x = 0 + 3 * 32, .y = 450},
               .speed = 0.05},
 
       (Cloud){.cloud = LoadTexture("resources/other/clouds/cloud5.png"),
-              .position = (Vector2){.x = 600, .y = 1100},
+              .position = (Vector2){.x = 600 + 3 * 32, .y = 1100},
               .speed = 0.1},
 
       (Cloud){.cloud = LoadTexture("resources/other/clouds/cloud6.png"),
-              .position = (Vector2){.x = 1800, .y = 300},
+              .position = (Vector2){.x = 1800 + 3 * 32, .y = 300},
               .speed = 0.2},
 
   };
@@ -2503,7 +2555,7 @@ int main() {
       .current_frame_no = 1,
       .current_frame_rec =
           (Rectangle){.x = 0, .y = 0, .width = 72, .height = 72},
-      .position = (Vector2){.x = 15 * 32, .y = 39 * 32 - 72}
+      .position = (Vector2){.x = 18 * 32, .y = 39 * 32 - 72}
 
   };
 
@@ -2516,7 +2568,7 @@ int main() {
                                         .tile_height = 32};
 
   TilemapState tilemap = (TilemapState){.tileset = &tileset,
-                                        .width = 50 * tileset.tile_width,
+                                        .width = 56 * tileset.tile_width,
                                         .height = 48 * tileset.tile_height};
 
   Rectangle player = (Rectangle){.x = 0, .y = 1160, .width = 32, .height = 64};
@@ -2560,7 +2612,9 @@ int main() {
       .attack_heavy_sprite_back =
           LoadTexture("resources/hero/hero-attack-heavy-back.png"),
       .is_being_hit = false,
-      .death_sound = false
+      .death_sound = false,
+      .camera_shake = false,
+      .camera_shake_time = 0
 
   };
 
@@ -2578,12 +2632,12 @@ int main() {
       .floater = (int[]){44, 45, 45, 46},
       .floater_width = 4,
       .speed = 1.7,
-      .position = (Vector2){.x = 45 * tileset.tile_width,
+      .position = (Vector2){.x = 48 * tileset.tile_width,
                             .y = 40 * tileset.tile_height},
       .type = VERTICAL,
-      .lower_bound = (Vector2){.x = 45 * tileset.tile_width,
+      .lower_bound = (Vector2){.x = 48 * tileset.tile_width,
                                .y = 40 * tileset.tile_height},
-      .upper_bound = (Vector2){.x = 45 * tileset.tile_width,
+      .upper_bound = (Vector2){.x = 48 * tileset.tile_width,
                                .y = 31 * tileset.tile_height},
       .direction = 1,
 
@@ -2593,12 +2647,12 @@ int main() {
       (Floater){.floater = (int[]){44, 45, 46},
                 .floater_width = 3,
                 .speed = 1.7,
-                .position = (Vector2){.x = 31 * tileset.tile_width,
+                .position = (Vector2){.x = 34 * tileset.tile_width,
                                       .y = 31 * tileset.tile_height},
                 .type = HORIZONTAL,
-                .upper_bound = (Vector2){.x = 31 * tileset.tile_width,
+                .upper_bound = (Vector2){.x = 34 * tileset.tile_width,
                                          .y = 31 * tileset.tile_height},
-                .lower_bound = (Vector2){.x = 22 * tileset.tile_width,
+                .lower_bound = (Vector2){.x = 25 * tileset.tile_width,
                                          .y = 31 * tileset.tile_height},
                 .direction = 0
 
@@ -2609,12 +2663,12 @@ int main() {
       .floater_width = 4,
       .speed = 1.9,
       .position =
-          (Vector2){.x = 2 * tileset.tile_width, .y = 31 * tileset.tile_height},
+          (Vector2){.x = 5 * tileset.tile_width, .y = 31 * tileset.tile_height},
       .type = VERTICAL,
       .upper_bound =
-          (Vector2){.x = 2 * tileset.tile_width, .y = 15 * tileset.tile_height},
+          (Vector2){.x = 5 * tileset.tile_width, .y = 15 * tileset.tile_height},
       .lower_bound =
-          (Vector2){.x = 2 * tileset.tile_width, .y = 31 * tileset.tile_height},
+          (Vector2){.x = 5 * tileset.tile_width, .y = 31 * tileset.tile_height},
       .direction = 0
 
   };
@@ -2650,7 +2704,7 @@ int main() {
       .height = 38,
       .damage = 1,
       .position =
-          (Vector2){.x = 8 * tilemap.tileset->tile_width,
+          (Vector2){.x = 11 * tilemap.tileset->tile_width,
                     .y = 31 * tilemap.tileset->tile_height - trap.height},
       .hitbox = (Rectangle){.width = trap.width,
                             .height = trap.height,
@@ -2665,10 +2719,10 @@ int main() {
       .time_needed = 0.05,
       .time_passed = 0,
       .lower_bound =
-          (Vector2){.x = 8 * tilemap.tileset->tile_width + 15,
+          (Vector2){.x = 11 * tilemap.tileset->tile_width + 15,
                     .y = 31 * tilemap.tileset->tile_height - trap.height},
       .upper_bound =
-          (Vector2){.x = 20 * tilemap.tileset->tile_width,
+          (Vector2){.x = 23 * tilemap.tileset->tile_width,
                     .y = 31 * tilemap.tileset->tile_height - trap.height},
       .speed = 1,
       .max_speed = 10,
@@ -2685,13 +2739,13 @@ int main() {
 
       .mode = MOB_WALK,
       .hp = 1,
-      .hurtbox = (Rectangle){.x = 11 * tilemap.tileset->tile_width,
+      .hurtbox = (Rectangle){.x = 14 * tilemap.tileset->tile_width,
                              .y = 21 * tilemap.tileset->tile_height + 24,
                              .width = 40,
                              .height = 40},
-      .lower_bound = (Vector2){.x = 11 * tilemap.tileset->tile_width,
+      .lower_bound = (Vector2){.x = 14 * tilemap.tileset->tile_width,
                                .y = 21 * tilemap.tileset->tile_height + 24},
-      .upper_bound = (Vector2){.x = 22 * tilemap.tileset->tile_width,
+      .upper_bound = (Vector2){.x = 25 * tilemap.tileset->tile_width,
                                .y = 21 * tilemap.tileset->tile_height + 24},
 
       .damage = 0.35,
@@ -2803,13 +2857,13 @@ int main() {
 
       .bullet_hitbox = (Rectangle){.x = 0, .y = 0, .width = 20, .height = 5},
 
-      .hurtbox = (Rectangle){.x = 24 * tilemap.tileset->tile_width,
+      .hurtbox = (Rectangle){.x = 27 * tilemap.tileset->tile_width,
                              .y = 13 * tilemap.tileset->tile_height + 24,
                              .width = 40,
                              .height = 40},
-      .lower_bound = (Vector2){.x = 24 * tilemap.tileset->tile_width,
+      .lower_bound = (Vector2){.x = 27 * tilemap.tileset->tile_width,
                                .y = 13 * tilemap.tileset->tile_height + 24},
-      .upper_bound = (Vector2){.x = 28 * tilemap.tileset->tile_width,
+      .upper_bound = (Vector2){.x = 31 * tilemap.tileset->tile_width,
                                .y = 13 * tilemap.tileset->tile_height + 24},
 
       .damage = 0.45,
@@ -2924,7 +2978,7 @@ int main() {
       .mode = TRAMPOLINE_IDLE,
       .width = 28,
       .height = 28,
-      .position = (Vector2){.x = 10 * 32, .y = 15 * 32 - 28},
+      .position = (Vector2){.x = 13 * 32, .y = 15 * 32 - 28},
       .sprite = LoadTexture("resources/traps/trampoline.png"),
       .time_needed = 0.1,
       .time_passed = 0,
@@ -2937,7 +2991,8 @@ int main() {
   while (!WindowShouldClose()) {
 
 #ifdef DEBUG
-    printf("is_being_hit: %d + in_attack_light: %d\n", player_state.is_being_hit, player_state.in_attack_light);
+    printf("is_being_hit: %d + in_attack_light: %d\n",
+           player_state.is_being_hit, player_state.in_attack_light);
 #endif
 
     if (menu == MAIN_MENU) {
@@ -3006,9 +3061,9 @@ int main() {
 
       BeginMode2D(camera);
 
-      DrawTexture(bg, 0, 0, WHITE);
+      DrawRectangle(0, 0, 55 * 32, 48 * 32, (Color){162, 210, 228, 255});
       DrawClouds(clouds);
-      DrawTexture(bg1, 0, 0, WHITE);
+      DrawTexture(bg1, 3 * 32, 0, WHITE);
       AnimateFountain(&fountain);
 
       if (IsKeyDown(KEY_T)) {
@@ -3245,7 +3300,6 @@ int main() {
   CloseAudioDevice();
 
   UnloadTexture(tileset_texture);
-  UnloadTexture(bg);
   UnloadTexture(bg1);
   for (int i = 0; i < animation_states_count; i++) {
     UnloadTexture(animation_states[i].sprite.sheet);
