@@ -2,9 +2,12 @@
 #include <raylib.h>
 #include <stdalign.h>
 #include <stdbool.h>
-#include <stdio.h>
 
-#define DEBUG
+// #define DEBUG
+
+#ifdef DEBUG
+#include <stdio.h>
+#endif
 
 typedef enum { MAIN_MENU, GAME_MENU, DEATH_MENU } Menus;
 
@@ -1392,7 +1395,6 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
 
     if (golemr->hp > 0) {
       PlaySound(*sound_golem_hit);
-
     }
   }
 
@@ -3268,6 +3270,8 @@ int main() {
         // that instead of everything else
 
         player_state.death_sound = false;
+        player_state.camera_shake = false;
+        player_state.camera_shake_time = 0;
         player_state.last_direction = 1;
         player_state.in_jump = 0;
         player_state.in_attack_light = 0;
