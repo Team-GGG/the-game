@@ -72,6 +72,7 @@ typedef struct {
   float attack_heavy_time_passed;
   float attack_heavy_time_needed;
   float camera_shake_time;
+  float no_attack;
 
   bool is_grounded;
   bool in_jump;
@@ -308,6 +309,19 @@ typedef struct {
   Vector2 position;
 
 } FountainAnimation;
+
+typedef struct {
+
+  Texture2D sprite;
+  int frame_count;
+  int current_frame_no;
+  Rectangle current_frame_rec;
+  float time_needed;
+  float time_passed;
+  Vector2 position;
+  Rectangle hitbox;
+
+} Spear;
 
 float diff(float a, float b) { return ((a - b > 0) ? (a - b) : (b - a)); }
 
@@ -762,7 +776,78 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
       4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
       4,  4,  4,  4,  4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,
       4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
-      4,  4,  4,  4,  4,  4};
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  61, 4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  38, 4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  62, 0,  0,  0,  0,  0,
+      61, 4,  4,  4,  38, 4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  38, 4,  4,  4,  4,  62, 0,  0,  0,
+      0,  0,  61, 4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  57, 4,  40, 4,  4,  40, 4,  4,  4,  57, 4,
+      38, 4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  62, 0,
+      0,  0,  0,  0,  61, 4,  4,  4,  4,  4,  4,  57, 4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  58, 0,  61, 4,  4,  4,  4,  4,  4,  58,
+      0,  56, 4,  4,  4,  4,  4,  4,  57, 57, 57, 57, 4,  4,  4,  4,  4,  4,
+      62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  4,  4,  58, 0,  61, 4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  57, 57, 58, 0,  0,  61, 4,  4,  4,  4,  57,
+      58, 0,  0,  0,  56, 57, 4,  40, 4,  58, 0,  0,  0,  0,  56, 4,  40, 4,
+      4,  4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  57, 58, 0,  0,  56, 4,
+      4,  4,  4,  4,  4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  56, 4,  38, 4,
+      58, 0,  0,  0,  0,  0,  0,  0,  56, 57, 58, 0,  0,  0,  0,  0,  0,  56,
+      4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  62, 0,  0,  0,  0,
+      0,  0,  56, 4,  4,  4,  39, 4,  4,  4,  62, 0,  0,  0,  0,  0,  0,  56,
+      4,  4,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  56, 57, 57, 4,  62, 0,  0,  0,  0,  0,  61, 4,  40, 62, 0,  0,
+      0,  0,  0,  0,  0,  39, 4,  4,  4,  4,  4,  4,  58, 0,  0,  0,  0,  0,
+      0,  0,  56, 4,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  56, 58, 0,  0,  0,  0,  0,  56, 4,  4,  58,
+      0,  0,  0,  0,  0,  0,  0,  56, 57, 57, 4,  4,  4,  62, 0,  0,  0,  0,
+      0,  0,  0,  0,  0,  56, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  56,
+      58, 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  56, 4,  38, 62, 0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  56, 57, 58,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  22, 22, 22, 22, 22, 22, 22, 22,
+      22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22,
+      22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22,
+      22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4};
 
   Rectangle current_tile =
       (Rectangle){.x = 0, .y = 0, .width = 32, .height = 32};
@@ -833,6 +918,12 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
 
 void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
             PlayerMode *mode) {
+
+  if (player_state->no_attack >= 0) {
+    player_state->no_attack -= GetFrameTime();
+  } else {
+    player_state->no_attack = 0;
+  }
 
   if (IsKeyDown(KEY_A) && !player_state->in_attack_light &&
       !player_state->in_attack_heavy && !player_state->is_being_hit) {
@@ -1309,6 +1400,7 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
     player_state->in_attack_light = false;
     player_state->in_attack_heavy = false;
     player_state->is_attack_hit = 1;
+    player_state->no_attack = 0.5;
     return;
   }
 
@@ -1374,7 +1466,7 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
       SimpleCollisionCheck(&hitbox, &golem->hurtbox)) {
     golem->hp -= player_state->attack_light_damage;
     player_state->is_attack_hit = 0;
-    golem->idle_buffer = .6;
+    golem->idle_buffer = .7;
 
     if (player_state->player->x >= golem->hurtbox.x) {
       golem->direction = 1;
@@ -1391,7 +1483,7 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
       SimpleCollisionCheck(&hitbox, &golemr->hurtbox)) {
     golemr->hp -= player_state->attack_light_damage;
     player_state->is_attack_hit = 0;
-    golemr->idle_buffer = .7;
+    golemr->idle_buffer = .8;
 
     if (golemr->hp > 0) {
       PlaySound(*sound_golem_hit);
@@ -1407,6 +1499,7 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
 void HandleAttackHeavy(PlayerState *player_state, Sound *sound_attack_heavy,
                        MobGolem *golem, Sound *sound_golem_hit,
                        MobGolemR *golemr) {
+
 
   if (player_state->is_being_hit) {
     player_state->in_attack_heavy = false;
@@ -1430,6 +1523,7 @@ void HandleAttackHeavy(PlayerState *player_state, Sound *sound_attack_heavy,
     player_state->in_attack_heavy = false;
     player_state->in_attack_light = false;
     player_state->is_attack_hit = 1;
+    player_state->no_attack = 0.5;
     return;
   }
 
@@ -1488,6 +1582,7 @@ void HandleAttackHeavy(PlayerState *player_state, Sound *sound_attack_heavy,
   }
 
   if (SimpleCollisionCheck(&hitbox, &golem->hurtbox)) {
+
     golem->idle_buffer = .1;
 
     if (player_state->player->x >= golem->hurtbox.x) {
@@ -1502,7 +1597,7 @@ void HandleAttackHeavy(PlayerState *player_state, Sound *sound_attack_heavy,
       player_state->attack_heavy_current_frame_no >= 9) {
     golem->hp -= player_state->attack_heavy_damage;
     player_state->is_attack_hit = 0;
-    golem->idle_buffer = .1;
+    golemr->idle_buffer = .1;
 
     if (player_state->player->x >= golem->hurtbox.x) {
       golem->direction = 1;
@@ -2510,6 +2605,72 @@ void AnimateFountain(FountainAnimation *fountain) {
                  fountain->position, WHITE);
 }
 
+void UpdateSpear(Spear *spear, PlayerState *player_state) {
+
+  if (spear->current_frame_no <= 2) {
+    spear->hitbox.y = spear->position.y + 48;
+  }
+
+  else if (spear->current_frame_no <= 7) {
+    spear->hitbox.y = spear->position.y;
+  }
+
+  else if (spear->current_frame_no == 8) {
+    spear->hitbox.y = spear->position.y + 22;
+  }
+
+  else {
+    spear->hitbox.y = spear->position.y;
+  }
+
+  if (SimpleCollisionCheck(player_state->player, &spear->hitbox)) {
+    player_state->hp = 0;
+  }
+}
+
+void DrawSpear(Spear *spear, Sound *sound_spear, PlayerState *player_state) {
+
+  spear->time_passed += GetFrameTime();
+
+  if (spear->time_passed >= spear->time_needed) {
+    spear->current_frame_no++;
+    spear->time_passed = 0;
+  }
+
+  if (spear->current_frame_no == spear->frame_count) {
+    spear->current_frame_no = 1;
+  }
+
+  if (spear->current_frame_no == 2 &&
+      diff(player_state->player->y, spear->position.y) <= 500 &&
+      diff(player_state->player->x, spear->position.x) <= 600) {
+    PlaySound(*sound_spear);
+    SetSoundVolume(*sound_spear, .5f);
+  }
+
+  spear->current_frame_rec.x =
+      (spear->current_frame_no - 1) * spear->current_frame_rec.width;
+
+  DrawTextureRec(spear->sprite, spear->current_frame_rec, spear->position,
+                 WHITE);
+
+  DrawTextureRec(spear->sprite, spear->current_frame_rec,
+                 (Vector2){.x = spear->position.x + 16, .y = spear->position.y},
+                 WHITE);
+
+  DrawTextureRec(spear->sprite, spear->current_frame_rec,
+                 (Vector2){.x = spear->position.x + 32, .y = spear->position.y},
+                 WHITE);
+
+  DrawTextureRec(spear->sprite, spear->current_frame_rec,
+                 (Vector2){.x = spear->position.x + 48, .y = spear->position.y},
+                 WHITE);
+
+  DrawTextureRec(spear->sprite, spear->current_frame_rec,
+                 (Vector2){.x = spear->position.x + 64, .y = spear->position.y},
+                 WHITE);
+}
+
 int main() {
   Menus menu = MAIN_MENU;
 
@@ -2520,6 +2681,7 @@ int main() {
   InitWindow(window.width, window.height, "GGG");
 
   Texture2D bg1 = LoadTexture("resources/bg/bg1.png");
+  Texture2D bg2 = LoadTexture("resources/bg/bg2.png");
 
   Cloud clouds[6] = {
 
@@ -2571,7 +2733,7 @@ int main() {
 
   TilemapState tilemap = (TilemapState){.tileset = &tileset,
                                         .width = 56 * tileset.tile_width,
-                                        .height = 48 * tileset.tile_height};
+                                        .height = 71 * tileset.tile_height};
 
   Rectangle player = (Rectangle){.x = 0, .y = 1160, .width = 32, .height = 64};
   PlayerState player_state = (PlayerState){
@@ -2616,7 +2778,8 @@ int main() {
       .is_being_hit = false,
       .death_sound = false,
       .camera_shake = false,
-      .camera_shake_time = 0
+      .camera_shake_time = 0,
+      .no_attack = 0
 
   };
 
@@ -2698,6 +2861,8 @@ int main() {
   Sound sound_bullet_hit = LoadSound("resources/audio/bullet_hit.mp3");
   Sound sound_spring = LoadSound("resources/audio/spring.mp3");
   Sound sound_nature = LoadSound("resources/audio/nature.mp3");
+  Sound sound_spear = LoadSound("resources/audio/spear.mp3");
+
   SetTargetFPS(window.fps);
 
   Trap trap = (Trap){
@@ -2990,11 +3155,26 @@ int main() {
           (Rectangle){.x = 0, .y = 0, .width = 28, .height = 28},
   };
 
+  Spear spear = {
+
+      .sprite = LoadTexture("resources/traps/spear.png"),
+      .frame_count = 12,
+      .current_frame_no = 1,
+      .current_frame_rec =
+          (Rectangle){.x = 0, .y = 0, .width = 16, .height = 64},
+      .time_needed = 0.1,
+      .time_passed = 0,
+      .position = (Vector2){.x = 10 * 32, .y = 66 * 32},
+      .hitbox =
+          (Rectangle){.x = 10 * 32 + 4, .y = 66 * 32, .width = 72, .height = 16}
+
+  };
+
   while (!WindowShouldClose()) {
 
 #ifdef DEBUG
-    printf("is_being_hit: %d + in_attack_light: %d\n",
-           player_state.is_being_hit, player_state.in_attack_light);
+    // printf("is_being_hit: %d + in_attack_light: %d\n",
+    //        player_state.is_being_hit, player_state.in_attack_light);
 #endif
 
     if (menu == MAIN_MENU) {
@@ -3058,6 +3238,7 @@ int main() {
       UpdateGolemR(&golemr, &player_state, &sound_golemr_collision);
       UpdateTrampoline(&trampoline, &player_state);
       UpdateClouds(clouds);
+      UpdateSpear(&spear, &player_state);
 
       BeginDrawing();
 
@@ -3066,6 +3247,7 @@ int main() {
       DrawRectangle(0, 0, 55 * 32, 48 * 32, (Color){162, 210, 228, 255});
       DrawClouds(clouds);
       DrawTexture(bg1, 3 * 32, 0, WHITE);
+      DrawTexture(bg2, 0, 43 * 32, WHITE);
       AnimateFountain(&fountain);
 
       if (IsKeyDown(KEY_T)) {
@@ -3084,16 +3266,19 @@ int main() {
                                    .width = 28,
                                    .height = 8},
                        BLUE);
+      DrawRectangleRec(spear.hitbox, RED);
 #endif
       DrawTrap(&trap);
       DrawTrampoline(&trampoline, &sound_spring);
+      DrawSpear(&spear, &sound_spear, &player_state);
 
 #ifdef DEBUG
       DrawRectangleRec(player, RED);
 #endif
 
       if ((!player_state.in_attack_heavy) &&
-          (player_state.in_attack_light || IsKeyPressed(KEY_J))) {
+          (player_state.in_attack_light || IsKeyPressed(KEY_J)) &&
+          (player_state.no_attack <= 0)) {
         current_mode = ATTACK_LIGHT;
         player_state.in_attack_light = true;
         HandleAttackLight(&player_state, &sound_attack_light, &golem,
@@ -3102,7 +3287,8 @@ int main() {
       }
 
       else if ((!player_state.in_attack_light) &&
-               (player_state.in_attack_heavy || IsKeyPressed(KEY_K))) {
+               (player_state.in_attack_heavy || IsKeyPressed(KEY_K)) &&
+               (player_state.no_attack <= 0)) {
         current_mode = ATTACK_HEAVY;
         player_state.in_attack_heavy = true;
         HandleAttackHeavy(&player_state, &sound_attack_heavy, &golem,
@@ -3300,11 +3486,13 @@ int main() {
   UnloadSound(sound_golemr_collision);
   UnloadSound(sound_bullet);
   UnloadSound(sound_bullet_hit);
+  UnloadSound(sound_spear);
 
   CloseAudioDevice();
 
   UnloadTexture(tileset_texture);
   UnloadTexture(bg1);
+  UnloadTexture(bg2);
   for (int i = 0; i < animation_states_count; i++) {
     UnloadTexture(animation_states[i].sprite.sheet);
   }
@@ -3326,6 +3514,8 @@ int main() {
   UnloadTexture(golem.golem_death_back.sprite);
 
   UnloadTexture(trampoline.sprite);
+  UnloadTexture(spear.sprite);
+  UnloadTexture(trap.sprite_sheet);
 
   UnloadTexture(golemr.golemr_walk.sprite);
   UnloadTexture(golemr.golemr_attack.sprite);
