@@ -2,12 +2,56 @@
 #include <raylib.h>
 #include <stdalign.h>
 #include <stdbool.h>
-
+#include <stdio.h>
 // #define DEBUG
 
 #ifdef DEBUG
 #include <stdio.h>
 #endif
+int globalarrayforspritenumber[9] = {4,8,9,8,7,7,10,10,4}; // number of image in each row in spritesheet
+typedef enum {
+  IDLE_BOSS,
+  GLOWING_BOSS,
+  RANGEDATTACK_BOSS,
+  DEFEND_BOSS,
+  MELEEATTACK_BOSS,
+  LASERATTACK_BOSS,
+  WALK_BOSS,
+  SOMETHING_BOSS,
+  DEATH_BOSS
+} BossMode;
+typedef struct {
+  Texture2D texture;
+  BossMode mode;
+  int currentframe;
+  float framecounter;
+  float updatetime;
+  float facingdirection;
+  float speed;
+  Rectangle bossrectangle;
+} Boss;
+
+void BossAnimation(Boss * boss){
+  int which_animation_to_play = boss->mode;
+  float framelength = (float)boss->texture.width / 10;
+  float frameheight = (float)boss->texture.height / 9;
+  boss->framecounter += GetFrameTime();
+  if (boss->framecounter >= boss->updatetime){
+    boss -> framecounter = 0.0f;
+    boss -> currentframe++;
+  
+  if (boss->currentframe >= globalarrayforspritenumber[which_animation_to_play]){
+    boss->currentframe = 0;
+  }}
+  Rectangle source = {
+    (boss->currentframe) * (framelength),
+    (which_animation_to_play) * (frameheight),
+    framelength * boss->facingdirection,
+    frameheight
+  };
+  Vector2 pivotPoint = { boss->bossrectangle.width / 2.0f, boss->bossrectangle.height };
+    DrawTexturePro(boss->texture, source, boss-> bossrectangle, pivotPoint, 0.0f, WHITE);
+}
 
 typedef enum { MAIN_MENU, GAME_MENU, DEATH_MENU } Menus;
 
@@ -2512,6 +2556,8 @@ void AnimateFountain(FountainAnimation *fountain) {
 
 int main() {
   Menus menu = MAIN_MENU;
+  
+  
 
   WindowState window = (WindowState){.width = 1600, .height = 896, .fps = 60};
   PlatformState platform = (PlatformState){.tile_width = 32, .tile_height = 32};
@@ -2520,6 +2566,22 @@ int main() {
   InitWindow(window.width, window.height, "GGG");
 
   Texture2D bg1 = LoadTexture("resources/bg/bg1.png");
+
+  Texture2D sheet = LoadTexture("Character_sheet.png");
+  float framewidth = sheet.width/10;
+  float frameheight = sheet.height/9;
+  Boss boss = {
+    .bossrectangle = {300,800,framewidth*2.5f,frameheight*2.5f},
+    .mode = IDLE_BOSS,
+    .currentframe = 0,
+    .framecounter = 0,
+    .updatetime = 0.1f,
+    .facingdirection = 1.0f,
+    .speed = 0.0f
+  };
+
+  boss.texture = sheet;
+  
 
   Cloud clouds[6] = {
 
@@ -3087,7 +3149,7 @@ int main() {
 #endif
       DrawTrap(&trap);
       DrawTrampoline(&trampoline, &sound_spring);
-
+      
 #ifdef DEBUG
       DrawRectangleRec(player, RED);
 #endif
@@ -3211,8 +3273,10 @@ int main() {
                      &sound_bullet_hit);
         }
       }
-
+    
+    
       EndMode2D();
+      BossAnimation(&boss);
       EndDrawing();
 
       if ((player_state.player->y) > (tilemap.height - 32)) {
@@ -3334,6 +3398,6 @@ int main() {
   UnloadTexture(golemr.golemr_walk_back.sprite);
   UnloadTexture(golemr.golemr_attack_back.sprite);
   UnloadTexture(golemr.golemr_bullet_back.sprite);
-
+  UnloadTexture(boss.texture);
   CloseWindow();
 }
