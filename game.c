@@ -3,13 +3,15 @@
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdio.h>
-// #define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #include <stdio.h>
 #endif
-int globalarrayforspritenumber[9] = {4,8,9,8,7,7,10,10,4}; // number of image in each row in spritesheet
+
+
 typedef enum {
+
   IDLE_BOSS,
   GLOWING_BOSS,
   RANGEDATTACK_BOSS,
@@ -19,55 +21,31 @@ typedef enum {
   WALK_BOSS,
   SOMETHING_BOSS,
   DEATH_BOSS
+
 } BossMode;
+
 typedef struct {
+
   Texture2D texture;
+  Vector2 position;
+
   BossMode mode;
-  int currentframe;
-  float framecounter;
-  float updatetime;
-  float facingdirection;
+
+  int current_frame_no;
+  int sprite_numbers[9];
+  int frame_width;
+  int frame_height;
+
+  bool facing_direction;
+
+  float time_passed;
   float speed;
-  Rectangle bossrectangle;
+  float time_needed[9];
+
+  Rectangle hitbox;
+  Rectangle current_frame_rec;
+
 } Boss;
-
-void BossAnimation(Boss * boss){
-  int which_animation_to_play = boss->mode;
-  float framelength = (float)boss->texture.width / 10;
-  float frameheight = (float)boss->texture.height / 9;
-  boss->framecounter += GetFrameTime();
-  if (boss->framecounter >= boss->updatetime){
-    boss -> framecounter = 0.0f;
-    boss -> currentframe++;
-  
-  if (boss->currentframe >= globalarrayforspritenumber[which_animation_to_play]){
-    boss->currentframe = 0;
-    if (boss->mode == MELEEATTACK_BOSS){
-      boss -> mode = IDLE_BOSS;
-    }
-  }}
-  Rectangle source = {
-    (boss->currentframe) * (framelength),
-    (which_animation_to_play) * (frameheight),
-    framelength * boss->facingdirection,
-    frameheight
-  };
-  Vector2 pivotpoint = { boss->bossrectangle.width / 2.0f, boss->bossrectangle.height / 2.0f};
-    DrawTexturePro(boss->texture, source, boss-> bossrectangle, pivotpoint, 0.0f, WHITE);
-}
-
-void BossAI(Boss * boss, Rectangle * player){
-  float distance = (boss-> bossrectangle.x) - (player->x);
-  if (distance < 0){
-    boss->facingdirection = 1.0f;
-  }
-  else {
-    boss ->  facingdirection = -1.0f;
-  }
-  if ((distance < 100) && (distance > -100)){
-    boss->mode = MELEEATTACK_BOSS;
-  }  
-}
 
 typedef enum { MAIN_MENU, GAME_MENU, DEATH_MENU } Menus;
 
@@ -2570,10 +2548,49 @@ void AnimateFountain(FountainAnimation *fountain) {
                  fountain->position, WHITE);
 }
 
+void DrawBoss(Boss *boss) {
+
+  boss->time_passed += GetFrameTime();
+
+  if (boss->time_passed >= boss->time_needed[boss->mode]) {
+
+    boss->time_passed = 0.0;
+    boss->current_frame_no++;
+  }
+
+  if (boss->current_frame_no >= boss->sprite_numbers[boss->mode]) {
+    boss->current_frame_no = 1;
+  }
+
+  boss->current_frame_rec.x = (boss->current_frame_no - 1) * boss->frame_width;
+  boss->current_frame_rec.y = boss->mode * boss->frame_height;
+
+  DrawTexturePro(boss->texture, boss->current_frame_rec,
+                 (Rectangle){.x = boss->position.x,
+                             .y = boss->position.y - boss->frame_height * 2 + 50,
+                             .width = boss->frame_width * 2,
+                             .height = boss->frame_height * 2},
+                 (Vector2){0, 0}, 0,
+                 WHITE)
+  ;
+}
+
+void UpdateBoss(Boss *boss, PlayerState *player_state) {
+
+  float distance = boss->position.x - player_state->player->x;
+
+  if (distance < 0) {
+    boss->facing_direction = 1;
+  }
+
+  else {
+    boss->facing_direction = 0;
+  }
+
+}
+
 int main() {
   Menus menu = MAIN_MENU;
-  
-  
 
   WindowState window = (WindowState){.width = 1600, .height = 896, .fps = 60};
   PlatformState platform = (PlatformState){.tile_width = 32, .tile_height = 32};
@@ -2582,11 +2599,6 @@ int main() {
   InitWindow(window.width, window.height, "GGG");
 
   Texture2D bg1 = LoadTexture("resources/bg/bg1.png");
-
-  Texture2D Sheet = LoadTexture("Character_sheet.png");
-  
-  
-  
 
   Cloud clouds[6] = {
 
@@ -2686,18 +2698,26 @@ int main() {
       .camera_shake_time = 0
 
   };
-  float framewidth = Sheet.width/10;
-  float frameheight = Sheet.height/9;
-  Boss boss = {
-    .bossrectangle = {player_state.player->x+1300,player_state.player->y,framewidth*2.5f,frameheight*2.5f},
-    .mode = IDLE_BOSS,
-    .currentframe = 0,
-    .framecounter = 0,
-    .updatetime = 0.1f,
-    .facingdirection = 1.0f,
-    .speed = 0.0f
-  };
-  boss.texture = Sheet;
+
+  Boss boss =
+      (Boss){.position = (Vector2){.x = 36 * 32, .y = 23 * 32},
+             .mode = IDLE_BOSS,
+             .speed = 5.8,
+             .hitbox =
+                 (Rectangle){
+                     .x = 0,
+                     .y = 0,
+                 },
+             .frame_width = 100,
+             .frame_height = 100,
+             .sprite_numbers = {4, 8, 9, 8, 7, 7, 10, 10, 4},
+             .texture = LoadTexture("resources/mob/boss/boss.png"),
+             .current_frame_no = 1,
+             .current_frame_rec =
+                 (Rectangle){.x = 0, .y = 0, .width = 100, .height = 100},
+             .time_needed = {0.2, 0.1},
+             .time_passed = 0.1,
+             .facing_direction = 1};
 
   Camera2D camera = (Camera2D){
       .offset =
@@ -3071,11 +3091,6 @@ int main() {
 
   while (!WindowShouldClose()) {
 
-#ifdef DEBUG
-    printf("is_being_hit: %d + in_attack_light: %d\n",
-           player_state.is_being_hit, player_state.in_attack_light);
-#endif
-
     if (menu == MAIN_MENU) {
       //  Draw phase
       BeginDrawing();
@@ -3137,12 +3152,11 @@ int main() {
       UpdateGolemR(&golemr, &player_state, &sound_golemr_collision);
       UpdateTrampoline(&trampoline, &player_state);
       UpdateClouds(clouds);
-      BossAI(&boss,&player);
+      UpdateBoss(&boss, &player_state);
 
       BeginDrawing();
 
       BeginMode2D(camera);
-
 
       DrawRectangle(0, 0, 55 * 32, 48 * 32, (Color){162, 210, 228, 255});
       DrawClouds(clouds);
@@ -3168,7 +3182,7 @@ int main() {
 #endif
       DrawTrap(&trap);
       DrawTrampoline(&trampoline, &sound_spring);
-      
+
 #ifdef DEBUG
       DrawRectangleRec(player, RED);
 #endif
@@ -3292,12 +3306,11 @@ int main() {
                      &sound_bullet_hit);
         }
       }
-      BossAnimation(&boss);
-    
-      
+
+      DrawBoss(&boss);
+
       EndMode2D();
-     
-      
+
       EndDrawing();
 
       if ((player_state.player->y) > (tilemap.height - 32)) {
