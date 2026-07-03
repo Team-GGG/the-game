@@ -42,6 +42,9 @@ void BossAnimation(Boss * boss){
   
   if (boss->currentframe >= globalarrayforspritenumber[which_animation_to_play]){
     boss->currentframe = 0;
+    if (boss->mode == MELEEATTACK_BOSS){
+      boss -> mode = IDLE_BOSS;
+    }
   }}
   Rectangle source = {
     (boss->currentframe) * (framelength),
@@ -49,8 +52,21 @@ void BossAnimation(Boss * boss){
     framelength * boss->facingdirection,
     frameheight
   };
-  Vector2 pivotPoint = { boss->bossrectangle.width / 2.0f, boss->bossrectangle.height };
-    DrawTexturePro(boss->texture, source, boss-> bossrectangle, pivotPoint, 0.0f, WHITE);
+  Vector2 pivotpoint = { boss->bossrectangle.width / 2.0f, boss->bossrectangle.height / 2.0f};
+    DrawTexturePro(boss->texture, source, boss-> bossrectangle, pivotpoint, 0.0f, WHITE);
+}
+
+void BossAI(Boss * boss, Rectangle * player){
+  float distance = (boss-> bossrectangle.x) - (player->x);
+  if (distance < 0){
+    boss->facingdirection = 1.0f;
+  }
+  else {
+    boss ->  facingdirection = -1.0f;
+  }
+  if ((distance < 100) && (distance > -100)){
+    boss->mode = MELEEATTACK_BOSS;
+  }  
 }
 
 typedef enum { MAIN_MENU, GAME_MENU, DEATH_MENU } Menus;
@@ -2567,20 +2583,9 @@ int main() {
 
   Texture2D bg1 = LoadTexture("resources/bg/bg1.png");
 
-  Texture2D sheet = LoadTexture("Character_sheet.png");
-  float framewidth = sheet.width/10;
-  float frameheight = sheet.height/9;
-  Boss boss = {
-    .bossrectangle = {300,800,framewidth*2.5f,frameheight*2.5f},
-    .mode = IDLE_BOSS,
-    .currentframe = 0,
-    .framecounter = 0,
-    .updatetime = 0.1f,
-    .facingdirection = 1.0f,
-    .speed = 0.0f
-  };
-
-  boss.texture = sheet;
+  Texture2D Sheet = LoadTexture("Character_sheet.png");
+  
+  
   
 
   Cloud clouds[6] = {
@@ -2681,6 +2686,18 @@ int main() {
       .camera_shake_time = 0
 
   };
+  float framewidth = Sheet.width/10;
+  float frameheight = Sheet.height/9;
+  Boss boss = {
+    .bossrectangle = {player_state.player->x+1300,player_state.player->y,framewidth*2.5f,frameheight*2.5f},
+    .mode = IDLE_BOSS,
+    .currentframe = 0,
+    .framecounter = 0,
+    .updatetime = 0.1f,
+    .facingdirection = 1.0f,
+    .speed = 0.0f
+  };
+  boss.texture = Sheet;
 
   Camera2D camera = (Camera2D){
       .offset =
@@ -3120,10 +3137,12 @@ int main() {
       UpdateGolemR(&golemr, &player_state, &sound_golemr_collision);
       UpdateTrampoline(&trampoline, &player_state);
       UpdateClouds(clouds);
+      BossAI(&boss,&player);
 
       BeginDrawing();
 
       BeginMode2D(camera);
+
 
       DrawRectangle(0, 0, 55 * 32, 48 * 32, (Color){162, 210, 228, 255});
       DrawClouds(clouds);
@@ -3273,10 +3292,12 @@ int main() {
                      &sound_bullet_hit);
         }
       }
-    
-    
-      EndMode2D();
       BossAnimation(&boss);
+    
+      
+      EndMode2D();
+     
+      
       EndDrawing();
 
       if ((player_state.player->y) > (tilemap.height - 32)) {
