@@ -2,12 +2,50 @@
 #include <raylib.h>
 #include <stdalign.h>
 #include <stdbool.h>
-
-// #define DEBUG
+#include <stdio.h>
+#define DEBUG
 
 #ifdef DEBUG
 #include <stdio.h>
 #endif
+
+typedef enum {
+
+  IDLE_BOSS,
+  GLOWING_BOSS,
+  RANGEDATTACK_BOSS,
+  DEFEND_BOSS,
+  MELEEATTACK_BOSS,
+  LASERATTACK_BOSS,
+  WALK_BOSS,
+  SOMETHING_BOSS,
+  DEATH_BOSS
+
+} BossMode;
+
+typedef struct {
+
+  Texture2D texture;
+  Texture2D texture_back;
+  Vector2 position;
+
+  BossMode mode;
+
+  int current_frame_no;
+  int sprite_numbers[9];
+  int frame_width;
+  int frame_height;
+
+  bool facing_direction;
+
+  float time_passed;
+  float speed;
+  float time_needed[9];
+
+  Rectangle hurtbox;
+  Rectangle current_frame_rec;
+
+} Boss;
 
 typedef enum { MAIN_MENU, GAME_MENU, DEATH_MENU } Menus;
 
@@ -1500,7 +1538,6 @@ void HandleAttackHeavy(PlayerState *player_state, Sound *sound_attack_heavy,
                        MobGolem *golem, Sound *sound_golem_hit,
                        MobGolemR *golemr) {
 
-
   if (player_state->is_being_hit) {
     player_state->in_attack_heavy = false;
     player_state->attack_heavy_current_frame_no = 1;
@@ -2671,6 +2708,66 @@ void DrawSpear(Spear *spear, Sound *sound_spear, PlayerState *player_state) {
                  WHITE);
 }
 
+void UpdateBoss(Boss *boss, PlayerState *player_state) {
+
+  boss->hurtbox.x = boss->position.x + 50;
+  boss->hurtbox.y = boss->position.y - 200 + 100;
+
+  float distance = boss->position.x - player_state->player->x;
+
+  if (distance < 0) {
+    boss->facing_direction = 1;
+  }
+
+  else {
+    boss->facing_direction = 0;
+  }
+}
+
+void DrawBoss(Boss *boss) {
+
+  boss->time_passed += GetFrameTime();
+
+  if (boss->time_passed >= boss->time_needed[boss->mode]) {
+
+    boss->time_passed = 0.0;
+    boss->current_frame_no++;
+  }
+
+  if (boss->current_frame_no >= boss->sprite_numbers[boss->mode]) {
+    boss->current_frame_no = 1;
+  }
+
+  if(boss->facing_direction){
+      boss->current_frame_rec.x = (boss->current_frame_no - 1) * boss->frame_width;
+      boss->current_frame_rec.y = boss->mode * boss->frame_height;
+
+      DrawTexturePro(
+          boss->texture, boss->current_frame_rec,
+          (Rectangle){.x = boss->position.x,
+                      .y = boss->position.y - boss->frame_height * 2 + 50,
+                      .width = boss->frame_width * 2,
+                      .height = boss->frame_height * 2},
+          (Vector2){0, 0}, 0, WHITE);
+  }
+
+  else{
+
+      boss->current_frame_rec.x = (10 - boss->current_frame_no ) * boss->frame_width;
+      boss->current_frame_rec.y = boss->mode * boss->frame_height;
+
+
+      DrawTexturePro(
+          boss->texture_back, boss->current_frame_rec,
+          (Rectangle){.x = boss->position.x,
+                      .y = boss->position.y - boss->frame_height * 2 + 50,
+                      .width = boss->frame_width * 2,
+                      .height = boss->frame_height * 2},
+          (Vector2){0, 0}, 0, WHITE);
+  }
+
+}
+
 int main() {
   Menus menu = MAIN_MENU;
 
@@ -2782,6 +2879,23 @@ int main() {
       .no_attack = 0
 
   };
+
+  Boss boss = (Boss){
+      .position = (Vector2){.x = 36 * 32, .y = 23 * 32},
+      .mode = IDLE_BOSS,
+      .speed = 5.8,
+      .hurtbox = (Rectangle){.x = 0, .y = 0, .width = 100, .height = 100},
+      .frame_width = 100,
+      .frame_height = 100,
+      .sprite_numbers = {4, 8, 9, 8, 7, 7, 10, 10, 4},
+      .texture = LoadTexture("resources/mob/boss/boss.png"),
+      .texture_back = LoadTexture("resources/mob/boss/boss_back.png"),
+      .current_frame_no = 1,
+      .current_frame_rec =
+          (Rectangle){.x = 0, .y = 0, .width = 100, .height = 100},
+      .time_needed = {0.2, 0.1},
+      .time_passed = 0.1,
+      .facing_direction = 1};
 
   Camera2D camera = (Camera2D){
       .offset =
@@ -3172,11 +3286,6 @@ int main() {
 
   while (!WindowShouldClose()) {
 
-#ifdef DEBUG
-    // printf("is_being_hit: %d + in_attack_light: %d\n",
-    //        player_state.is_being_hit, player_state.in_attack_light);
-#endif
-
     if (menu == MAIN_MENU) {
       //  Draw phase
       BeginDrawing();
@@ -3239,6 +3348,7 @@ int main() {
       UpdateTrampoline(&trampoline, &player_state);
       UpdateClouds(clouds);
       UpdateSpear(&spear, &player_state);
+      UpdateBoss(&boss, &player_state);
 
       BeginDrawing();
 
@@ -3398,7 +3508,14 @@ int main() {
         }
       }
 
+#ifdef DEBUG
+      DrawRectangleRec(boss.hurtbox, BLUE);
+#endif
+
+      DrawBoss(&boss);
+
       EndMode2D();
+
       EndDrawing();
 
       if ((player_state.player->y) > (tilemap.height - 32)) {
@@ -3524,6 +3641,6 @@ int main() {
   UnloadTexture(golemr.golemr_walk_back.sprite);
   UnloadTexture(golemr.golemr_attack_back.sprite);
   UnloadTexture(golemr.golemr_bullet_back.sprite);
-
+  UnloadTexture(boss.texture);
   CloseWindow();
 }
