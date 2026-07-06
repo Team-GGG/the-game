@@ -36,18 +36,24 @@ typedef struct {
   int frame_width;
   int frame_height;
 
-  bool facing_direction;
+  int facing_direction; //changed back to int , 1 means right , -1 means left or something;
 
   float time_passed;
   float speed;
   float time_needed[9];
+  float state_timer; // It was getting too complicated for me personally to work with time_passed for updating boss, was messing up the animations
 
   Rectangle hitbox;
   Rectangle current_frame_rec;
 
 } Boss;
 
-typedef enum { MAIN_MENU, GAME_MENU, DEATH_MENU } Menus;
+typedef enum { 
+  MAIN_MENU, 
+  GAME_MENU, 
+  DEATH_MENU,
+  HELP_MENU,
+  OPTIONS_MENU } Menus;
 
 typedef struct {
 
@@ -2558,34 +2564,109 @@ void DrawBoss(Boss *boss) {
     boss->current_frame_no++;
   }
 
-  if (boss->current_frame_no >= boss->sprite_numbers[boss->mode]) {
+  if (boss->current_frame_no > boss->sprite_numbers[boss->mode]) {
     boss->current_frame_no = 1;
   }
 
-  boss->current_frame_rec.x = (boss->current_frame_no - 1) * boss->frame_width;
+  boss->current_frame_rec.x = (boss->current_frame_no - 1) * boss->frame_width ;
   boss->current_frame_rec.y = boss->mode * boss->frame_height;
-
+  boss->current_frame_rec.width = boss->frame_width * boss->facing_direction;
   DrawTexturePro(boss->texture, boss->current_frame_rec,
                  (Rectangle){.x = boss->position.x,
                              .y = boss->position.y - boss->frame_height * 2 + 50,
-                             .width = boss->frame_width * 2,
+                             .width = boss->frame_width * 2 ,
                              .height = boss->frame_height * 2},
                  (Vector2){0, 0}, 0,
                  WHITE)
   ;
+  DrawRectangleLinesEx((Rectangle){.x = boss->position.x,
+                             .y = boss->position.y - boss->frame_height * 2 + 50,
+                             .width = boss->frame_width * 2 ,
+                             .height = boss->frame_height * 2}, 2.0f, RED);
 }
 
 void UpdateBoss(Boss *boss, PlayerState *player_state) {
+  
 
   float distance = boss->position.x - player_state->player->x;
-
-  if (distance < 0) {
+  float distance_vertical = boss->position.y - player_state->player->y;
+  
+  if (distance < -70 ) {
     boss->facing_direction = 1;
   }
-
   else {
-    boss->facing_direction = 0;
+    boss->facing_direction = -1;
   }
+  if (boss->mode == DEFEND_BOSS){
+    if (boss->state_timer >= 0){
+      boss->mode = DEFEND_BOSS;
+      boss->state_timer -= GetFrameTime();
+      if (boss->current_frame_no >= 8){
+        boss ->current_frame_no = 8;
+        boss ->time_passed = 0.0;
+      }
+    }
+    else{
+      boss->state_timer = 0;
+      boss->mode = IDLE_BOSS;
+     
+
+      
+    }
+  }
+  else if (boss->mode == RANGEDATTACK_BOSS ){
+     if (boss->state_timer >= 0){
+      boss->mode = RANGEDATTACK_BOSS;
+      boss->state_timer -= GetFrameTime();
+      if (boss->current_frame_no >= 9){
+        
+        boss ->time_passed = 0.0;
+      }
+    }
+    else{
+      boss->state_timer = 0;
+      boss->mode = IDLE_BOSS;
+     
+
+      
+    }
+
+  }
+  else if (IsKeyPressed(KEY_J)){
+    boss -> mode = DEFEND_BOSS;
+    boss->time_passed = 0.0 ;
+    boss ->current_frame_no = 1;
+    boss->state_timer = 2.5;
+    
+  }
+  else if (IsKeyPressed(KEY_K)){
+    boss -> mode = RANGEDATTACK_BOSS;
+    boss->time_passed = 0.0 ;
+    boss ->current_frame_no = 1;
+    boss->state_timer = 2.5;
+
+  }
+  else if ((distance <= -10 && distance >= -200) && (distance_vertical <= 200 && distance_vertical >= -200)){
+    boss->mode = MELEEATTACK_BOSS;
+  }
+  else if ((distance_vertical <= 200 && distance_vertical >= -200)){
+    if (distance < - 200 ){
+      boss->position.x += 5*GetFrameTime();
+      boss->mode = IDLE_BOSS;
+    }
+    if (distance  > - 10 ){
+      boss->position.x -= 5*GetFrameTime();
+      boss->mode = IDLE_BOSS;
+    }
+    else{
+      boss->mode = IDLE_BOSS;
+    }
+  }
+  
+  else{
+    boss->mode = IDLE_BOSS;
+  }
+  printf("Boss Mode: %d | Frame: %d | Pos X: %f\n", boss->mode, boss->current_frame_no, boss->position.x);
 
 }
 
@@ -2700,7 +2781,7 @@ int main() {
   };
 
   Boss boss =
-      (Boss){.position = (Vector2){.x = 36 * 32, .y = 23 * 32},
+      (Boss){.position = (Vector2){.x = 36 * 32, .y = 1300}, //changed to 1160 for testing
              .mode = IDLE_BOSS,
              .speed = 5.8,
              .hitbox =
@@ -2715,7 +2796,8 @@ int main() {
              .current_frame_no = 1,
              .current_frame_rec =
                  (Rectangle){.x = 0, .y = 0, .width = 100, .height = 100},
-             .time_needed = {0.2, 0.1},
+             .time_needed = {0.2, 0.1, 0.1, 0.1, 0.15, 0.1, 0.1, 0.1, 0.1},
+             .state_timer = 0.0f,
              .time_passed = 0.1,
              .facing_direction = 1};
 
@@ -3139,6 +3221,34 @@ int main() {
         menu = GAME_MENU;
       }
     }
+    if (menu == OPTIONS_MENU){
+      Rectangle btn = { 300, 270, 200, 60 }; 
+        bool hover = CheckCollisionPointRec(GetMousePosition(), btn);
+        
+        if (hover) {
+            btn = (Rectangle){ btn.x - 4, btn.y - 2, btn.width + 8, btn.height + 4 };
+        }
+
+        BeginDrawing();
+            ClearBackground((Color){15, 17, 26, 128});
+
+            DrawRectangleRec(btn, hover ? (Color){40, 50, 75, 230} : (Color){25, 30, 45, 200});
+            DrawRectangleLinesEx(btn, hover ? 3.0f : 2.0f, (Color){0, 180, 216, 255});
+
+            // 2. Measure and draw using your loaded font
+            float fontSize = hover ? 24.0f : 22.0f;
+            float spacing = 2.0f; // Space between letters
+            
+            Vector2 textSize = MeasureTextEx(font_press_start, "HELP", fontSize, spacing);
+            
+            // DrawTextEx allows you to pass your custom font structure
+            DrawTextEx(font_press_start, "HELP", 
+                       (Vector2){ btn.x + (btn.width - textSize.x) / 2, btn.y + (btn.height - textSize.y) / 2 }, 
+                       fontSize, spacing, WHITE);
+                       
+        EndDrawing();
+      
+    }
     if (menu == GAME_MENU) {
 
       if (!IsSoundPlaying(sound_nature)) {
@@ -3306,7 +3416,7 @@ int main() {
                      &sound_bullet_hit);
         }
       }
-
+      
       DrawBoss(&boss);
 
       EndMode2D();
