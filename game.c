@@ -841,14 +841,14 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
       62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  4,  4,  58, 0,  61, 4,  4,  4,
       4,  4,  4,  4,  4,  4,  4,  57, 57, 58, 0,  0,  61, 4,  4,  4,  4,  57,
       58, 0,  0,  0,  56, 57, 4,  40, 4,  58, 0,  0,  0,  0,  56, 4,  40, 4,
-      4,  4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  57, 58, 0,  0,  56, 4,
+      4,  4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  4,  57, 58, 0,  0,  56, 26,
       4,  4,  4,  4,  4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  56, 4,  38, 4,
       58, 0,  0,  0,  0,  0,  0,  0,  56, 57, 58, 0,  0,  0,  0,  0,  0,  56,
       4,  4,  4,  4,  62, 0,  0,  0,  0,  0,  61, 4,  4,  62, 0,  0,  0,  0,
       0,  0,  56, 4,  4,  4,  39, 4,  4,  4,  62, 0,  0,  0,  0,  0,  0,  56,
       4,  4,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  56, 57, 57, 4,  62, 0,  0,  0,  0,  0,  61, 4,  40, 62, 0,  0,
-      0,  0,  0,  0,  0,  39, 4,  4,  4,  4,  4,  4,  58, 0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  61, 4,  4,  4,  4,  4,  4,  58, 0,  0,  0,  0,  0,
       0,  0,  56, 4,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  56, 58, 0,  0,  0,  0,  0,  56, 4,  4,  58,
       0,  0,  0,  0,  0,  0,  0,  56, 57, 57, 4,  4,  4,  62, 0,  0,  0,  0,
@@ -885,11 +885,11 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  22, 22, 22, 22, 22, 22, 22, 22,
-      22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22,
-      22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22,
-      22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 4,  4,  4,  4,  4,  4,
+      0,  0,  9,  10, 10, 10, 10, 10, 10, 10, 12, 0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  10, 10, 10, 10, 10, 10, 10, 10,
+      10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+      10, 10, 10, 10, 19, 39, 4,  4,  4,  39, 4,  4,  4,  10, 10, 10, 10, 10,
+      10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 4,  4,  4,  4,  4,  4,
       4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
       4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
       4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
@@ -2718,7 +2718,6 @@ void DrawSpear(Spear *spear, Sound *sound_spear, PlayerState *player_state) {
                  WHITE);
 }
 
-
 void DrawBoss(Boss *boss) {
 
   boss->time_passed += GetFrameTime();
@@ -2736,6 +2735,7 @@ void DrawBoss(Boss *boss) {
   boss->current_frame_rec.x = (boss->current_frame_no - 1) * boss->frame_width;
   boss->current_frame_rec.y = boss->mode * boss->frame_height;
   boss->current_frame_rec.width = boss->frame_width * boss->facing_direction;
+
   DrawTexturePro(
       boss->texture, boss->current_frame_rec,
       (Rectangle){.x = boss->position.x,
@@ -2753,14 +2753,19 @@ void DrawBoss(Boss *boss) {
 
 void UpdateBoss(Boss *boss, PlayerState *player_state) {
 
+  boss->hurtbox.x = boss->position.x + 50;
+  boss->hurtbox.y = boss->position.y - 200 + 100;
+
   float distance = boss->position.x - player_state->player->x;
   float distance_vertical = boss->position.y - player_state->player->y;
 
   if (distance < -70) {
     boss->facing_direction = 1;
-  } else {
+  }
+  else {
     boss->facing_direction = -1;
   }
+
   if (boss->mode == DEFEND_BOSS) {
     if (boss->state_timer >= 0) {
       boss->mode = DEFEND_BOSS;
@@ -2769,11 +2774,16 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
         boss->current_frame_no = 8;
         boss->time_passed = 0.0;
       }
-    } else {
+    }
+
+    else {
       boss->state_timer = 0;
       boss->mode = IDLE_BOSS;
     }
-  } else if (boss->mode == RANGEDATTACK_BOSS) {
+  }
+
+  else if (boss->mode == RANGEDATTACK_BOSS) {
+
     if (boss->state_timer >= 0) {
       boss->mode = RANGEDATTACK_BOSS;
       boss->state_timer -= GetFrameTime();
