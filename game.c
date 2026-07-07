@@ -48,6 +48,28 @@ typedef struct {
 
 } Boss;
 
+typedef struct {
+  Texture2D texture;
+
+  bool active;
+  Vector2 position;
+  Vector2 spawn_position;
+  Vector2 velocity;
+
+  
+  float time_passed;
+  
+
+ 
+
+  int frame_width;
+  int frame_height;
+  int frame_count;
+
+  int last_boss_frame_no;
+
+} BossArm;
+
 typedef enum { 
   MAIN_MENU, 
   GAME_MENU, 
@@ -2554,7 +2576,7 @@ void AnimateFountain(FountainAnimation *fountain) {
                  fountain->position, WHITE);
 }
 
-void DrawBoss(Boss *boss) {
+void DrawBoss(Boss *boss, BossArm *arm) {
 
   boss->time_passed += GetFrameTime();
 
@@ -2583,8 +2605,90 @@ void DrawBoss(Boss *boss) {
                              .y = boss->position.y - boss->frame_height * 2 + 50,
                              .width = boss->frame_width * 2 ,
                              .height = boss->frame_height * 2}, 2.0f, RED);
+  if (arm->active) {
+
+     
+
+    DrawTexturePro(arm->texture, (Rectangle){0.0f,0.0f, (float)arm->texture.width * (-1)*(boss->facing_direction), (float)arm ->texture.height},
+                   (Rectangle){.x = arm->position.x , 
+                               .y = arm->position.y  ,
+                               .width = arm->frame_width  *0.6f,
+                               .height = arm->frame_height *0.6f },
+                   (Vector2){ 0,0}, 0, WHITE);
+
+#ifdef DEBUG
+    DrawRectangleLinesEx((Rectangle){.x = arm->position.x,
+                                     .y = arm->position.y,
+                                     .width = arm->frame_width,
+                                     .height = arm->frame_height},
+                         1.5f, YELLOW);
+#endif
+  }
 }
 
+
+
+void UpdateBossArm(BossArm *arm, Boss *boss, PlayerState *player_state) {
+  int  ARM_RELEASE_FRAME = 9 ;  // TODO: verify against your actual sprite sheet
+  float ARM_SPEED=  260.0f ;
+  float ARM_LIFETIME = 1.2f;
+  float  ARM_MAX_DISTANCE = 400.0f ;
+
+  if (boss->mode == RANGEDATTACK_BOSS &&
+      boss->current_frame_no == ARM_RELEASE_FRAME &&
+      arm->last_boss_frame_no != ARM_RELEASE_FRAME &&
+      !arm->active) {
+
+    arm->active = true;
+    
+    arm->time_passed = 0;
+    
+
+    float dir = (boss->facing_direction == 1) ? 1.0f : -1.0f;
+
+    arm->position = (Vector2){
+        .x = boss->position.x + boss->frame_width * 0.5f +
+             dir * (boss->frame_width * 0.3f),
+        .y = boss->position.y -boss->frame_height * 2 + 50 +
+             boss->frame_height * 0.4f};
+
+    arm->spawn_position = arm->position;
+    arm->velocity = (Vector2){.x = dir * ARM_SPEED, .y = 0};
+  }
+
+  arm->last_boss_frame_no = boss->current_frame_no;
+
+  if (!arm->active) {
+    return;
+  }
+
+  arm->position.x += arm->velocity.x * GetFrameTime();
+  arm->position.y += arm->velocity.y * GetFrameTime();
+
+  arm->time_passed += GetFrameTime();
+  /*if (arm->anim_timer >= 0.08f) {
+    arm->anim_timer = 0;
+    arm->current_frame_no++;
+    if (arm->current_frame_no > arm->frame_count) {
+      arm->current_frame_no = 1;
+    }
+  }*/
+
+  float traveled = diff(arm->position.x, arm->spawn_position.x);
+
+  Rectangle arm_rec = (Rectangle){.x = arm->position.x,
+                                  .y = arm->position.y,
+                                  .width = arm->frame_width*2,
+                                  .height = arm->frame_height*2};
+
+  bool hit_player = SimpleCollisionCheck(&arm_rec, player_state->player);
+
+  if (hit_player || traveled >= ARM_MAX_DISTANCE ||
+      arm->time_passed >= ARM_LIFETIME) {
+    arm->active = false;
+    arm->time_passed = 0;
+  }
+}
 void UpdateBoss(Boss *boss, PlayerState *player_state) {
   
 
@@ -2800,6 +2904,16 @@ int main() {
              .state_timer = 0.0f,
              .time_passed = 0.1,
              .facing_direction = 1};
+    BossArm boss_arm = (BossArm){
+      .texture = LoadTexture("resources/mob/boss/arm_projectile.png"),
+      .active = false,
+    
+      .time_passed = 0,
+    
+      .frame_width = boss.frame_width,
+      .frame_height = boss.frame_height,
+      .frame_count = boss.sprite_numbers[RANGEDATTACK_BOSS],
+      .last_boss_frame_no = 0};
 
   Camera2D camera = (Camera2D){
       .offset =
@@ -3219,34 +3333,51 @@ int main() {
       EndDrawing();
       if (IsKeyPressed(KEY_ENTER)) {
         menu = GAME_MENU;
+                            ;
       }
     }
     if (menu == OPTIONS_MENU){
-      Rectangle btn = { 300, 270, 200, 60 }; 
+      Rectangle btn = { 1100, 80, 400, 120 };
+      Rectangle btn_help = {1100, 300 , 400 , 120}; 
         bool hover = CheckCollisionPointRec(GetMousePosition(), btn);
+        bool hover_help = CheckCollisionPointRec(GetMousePosition(),btn_help);
         
         if (hover) {
-            btn = (Rectangle){ btn.x - 4, btn.y - 2, btn.width + 8, btn.height + 4 };
+            btn = (Rectangle){ btn_help.x - 4, btn_help.y - 2, btn_help.width + 8, btn_help.height + 4 };
         }
+         if (hover_help) {
+            btn = (Rectangle){ btn_help.x - 4, btn_help.y - 2, btn_help.width + 8, btn_help.height + 4 };
+        }
+       
+        
 
         BeginDrawing();
             ClearBackground((Color){15, 17, 26, 128});
 
             DrawRectangleRec(btn, hover ? (Color){40, 50, 75, 230} : (Color){25, 30, 45, 200});
             DrawRectangleLinesEx(btn, hover ? 3.0f : 2.0f, (Color){0, 180, 216, 255});
+            DrawRectangleRec(btn_help, hover_help ? (Color){40, 50, 75, 230} : (Color){25, 30, 45, 200});
+            DrawRectangleLinesEx(btn_help, hover_help ? 3.0f : 2.0f, (Color){0, 180, 216, 255});
 
             // 2. Measure and draw using your loaded font
-            float fontSize = hover ? 24.0f : 22.0f;
+            float fontSize = hover ? 48.0f : 44.0f;
             float spacing = 2.0f; // Space between letters
             
             Vector2 textSize = MeasureTextEx(font_press_start, "HELP", fontSize, spacing);
             
+            
             // DrawTextEx allows you to pass your custom font structure
-            DrawTextEx(font_press_start, "HELP", 
+            DrawTextEx(font_press_start, "PLAY", 
                        (Vector2){ btn.x + (btn.width - textSize.x) / 2, btn.y + (btn.height - textSize.y) / 2 }, 
-                       fontSize, spacing, WHITE);
+                       fontSize, spacing, WHITE);            
+          
                        
         EndDrawing();
+      if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+        menu = GAME_MENU;
+      }
+    }
+    if (menu == HELP_MENU){
       
     }
     if (menu == GAME_MENU) {
@@ -3263,6 +3394,7 @@ int main() {
       UpdateTrampoline(&trampoline, &player_state);
       UpdateClouds(clouds);
       UpdateBoss(&boss, &player_state);
+      UpdateBossArm(&boss_arm, &boss, &player_state);
 
       BeginDrawing();
 
@@ -3417,7 +3549,7 @@ int main() {
         }
       }
       
-      DrawBoss(&boss);
+      DrawBoss(&boss,&boss_arm);
 
       EndMode2D();
 
@@ -3543,5 +3675,6 @@ int main() {
   UnloadTexture(golemr.golemr_attack_back.sprite);
   UnloadTexture(golemr.golemr_bullet_back.sprite);
   UnloadTexture(boss.texture);
+  UnloadTexture(boss_arm.texture);
   CloseWindow();
 }
