@@ -2,12 +2,29 @@
 #include <raylib.h>
 #include <stdalign.h>
 #include <stdbool.h>
-#include <stdio.h>
-#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
 #include <stdio.h>
 #endif
+
+typedef struct {
+
+  Texture2D texture;
+  Vector2 position;
+
+  int current_frame_no;
+  int frame_count;
+  int frame_width;
+  int frame_height;
+
+  float time_passed;
+  float time_needed;
+
+  Rectangle hurtbox;
+  Rectangle current_frame_rec;
+
+} Flag;
 
 typedef enum {
 
@@ -56,7 +73,8 @@ typedef enum {
   GAME_MENU,
   DEATH_MENU,
   HELP_MENU,
-  OPTIONS_MENU
+  OPTIONS_MENU,
+  QUEST_1_MENU
 } Menus;
 
 typedef struct {
@@ -121,6 +139,7 @@ typedef struct {
   float attack_heavy_time_needed;
   float camera_shake_time;
   float no_attack;
+  float quest_1_complete;
 
   bool is_grounded;
   bool in_jump;
@@ -458,6 +477,42 @@ bool CollisionResponse(TileInformation *tile_info, PlayerState *player_state,
       else {
         player_state->player->y =
             tile_info->rec->y + tile_info->rec->height + y_push_back;
+      }
+    }
+
+    else if (left && up && !down && !right) {
+
+      if (((player_state->player->y + player_state->player->height) >=
+           (tile_info->rec->y + tile_info ->rec->height - buffer)) &&
+          ((player_state->player->x) <
+           (tile_info->rec->x + tile_info->rec->width - 15))) {
+        player_state->player->y =
+            tile_info->rec->y + tile_info->rec->height + player_state->player->height + y_push_back;
+      }
+
+      else {
+        player_state->player->x =
+            tile_info->rec->x + tile_info->rec->width + x_push_back;
+
+        player_state->player->y += player_state->sliding_speed;
+      }
+    }
+
+    else if (right && up && !down && !left) {
+
+      if (((player_state->player->y + player_state->player->height) >=
+           (tile_info->rec->y + tile_info ->rec->height - buffer)) &&
+          ((player_state->player->x) <
+           (tile_info->rec->x + 15))) {
+        player_state->player->y =
+            tile_info->rec->y + tile_info->rec->height + player_state->player->height + y_push_back;
+      }
+
+      else {
+        player_state->player->x =
+            tile_info->rec->x - x_push_back;
+
+        player_state->player->y += player_state->sliding_speed;
       }
     }
 
@@ -1331,7 +1386,9 @@ void UpdateFloaters(Floater floaters[], PlayerState *player_state) {
 
 void DrawTrap(Trap *trap) {
 
-  if (trap->time_needed >= trap->time_passed) {
+  trap->time_passed += GetFrameTime();
+
+  if (trap->time_passed >= trap->time_needed) {
     trap->current_frame_no++;
     trap->time_passed = 0;
   }
@@ -1344,6 +1401,28 @@ void DrawTrap(Trap *trap) {
       (trap->current_frame_no - 1) * trap->current_frame_rec.width;
 
   DrawTextureRec(trap->sprite_sheet, trap->current_frame_rec, trap->position,
+                 WHITE);
+}
+
+void DrawTrapUnderworld(Trap *trap_underworld) {
+
+  trap_underworld->time_passed += GetFrameTime();
+
+  if (trap_underworld->time_passed >= trap_underworld->time_needed) {
+    trap_underworld->current_frame_no++;
+    trap_underworld->time_passed = 0;
+  }
+
+  if (trap_underworld->current_frame_no > trap_underworld->frame_count) {
+    trap_underworld->current_frame_no = 1;
+  }
+
+  trap_underworld->current_frame_rec.x =
+      (trap_underworld->current_frame_no - 1) *
+      trap_underworld->current_frame_rec.width;
+
+  DrawTextureRec(trap_underworld->sprite_sheet,
+                 trap_underworld->current_frame_rec, trap_underworld->position,
                  WHITE);
 }
 
@@ -1383,6 +1462,32 @@ void UpdateTrap(Trap *trap, PlayerState *player_state, Sound *death_scream) {
 
   if (SimpleCollisionCheck(&trap->hitbox, player_state->player)) {
     player_state->hp -= trap->damage;
+  };
+
+  if (player_state->hp <= 0) {
+    PlaySound(*death_scream);
+  }
+}
+
+void UpdateTrapUnderworld(Trap *trap_underworld, PlayerState *player_state,
+                          Sound *death_scream) {
+
+  if (trap_underworld->position.x + trap_underworld->speed >
+      trap_underworld->upper_bound.x) {
+    trap_underworld->direction = 0;
+  }
+
+  else if (trap_underworld->position.x + trap_underworld->speed <
+           trap_underworld->lower_bound.x) {
+    trap_underworld->direction = 1;
+  }
+
+  trap_underworld->position.x +=
+      (trap_underworld->direction ? (1) : (-1)) * (trap_underworld->max_speed);
+  trap_underworld->hitbox.x = trap_underworld->position.x;
+
+  if (SimpleCollisionCheck(&trap_underworld->hitbox, player_state->player)) {
+    player_state->hp -= trap_underworld->damage;
   };
 
   if (player_state->hp <= 0) {
@@ -2761,8 +2866,7 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
 
   if (distance < -70) {
     boss->facing_direction = 1;
-  }
-  else {
+  } else {
     boss->facing_direction = -1;
   }
 
@@ -2827,8 +2931,46 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
   else {
     boss->mode = IDLE_BOSS;
   }
-  printf("Boss Mode: %d | Frame: %d | Pos X: %f\n", boss->mode,
-         boss->current_frame_no, boss->position.x);
+
+#ifdef DEBUG
+  // printf("Boss Mode: %d | Frame: %d | Pos X: %f\n", boss->mode,
+  //        boss->current_frame_no, boss->position.x);
+
+#endif
+}
+
+void HandleFlag(Flag *flag, PlayerState *player_state, Sound* next_level) {
+
+  flag->time_passed += GetFrameTime();
+
+  if (flag->time_passed >= flag->time_needed) {
+    flag->time_passed = 0;
+    flag->current_frame_no++;
+  }
+
+  if (flag->current_frame_no > flag->frame_count) {
+    flag->current_frame_no = 1;
+  }
+
+  flag->current_frame_rec.x =
+      ((flag->current_frame_no - 1) % 4) * (flag->frame_width);
+
+  flag->current_frame_rec.y =
+      (((flag->current_frame_no - 1) / 4) * (flag->frame_height));
+
+  DrawTextureRec(
+      flag->texture, flag->current_frame_rec,
+      (Vector2){flag->position.x, flag->position.y - flag->frame_height},
+      WHITE);
+
+  if (SimpleCollisionCheck(player_state->player, &flag->hurtbox)) {
+    player_state->quest_1_complete = 2;
+
+    player_state->player->x = 0;
+    player_state->player->y = 1160;
+
+    PlaySound(*next_level);
+  }
 }
 
 int main() {
@@ -2895,7 +3037,7 @@ int main() {
                                         .width = 56 * tileset.tile_width,
                                         .height = 71 * tileset.tile_height};
 
-  Rectangle player = (Rectangle){.x = 0, .y = 1160, .width = 32, .height = 64};
+  Rectangle player = (Rectangle){.x = 0, .y = 66 * 32, .width = 32, .height = 64};
   PlayerState player_state = (PlayerState){
       .player = &player,
       .speed = 5.7,
@@ -2939,7 +3081,8 @@ int main() {
       .death_sound = false,
       .camera_shake = false,
       .camera_shake_time = 0,
-      .no_attack = 0
+      .no_attack = 0,
+      .quest_1_complete = 0
 
   };
 
@@ -3040,6 +3183,7 @@ int main() {
   Sound sound_spring = LoadSound("resources/audio/spring.mp3");
   Sound sound_nature = LoadSound("resources/audio/nature.mp3");
   Sound sound_spear = LoadSound("resources/audio/spear.mp3");
+  Sound sound_next_level = LoadSound("resources/audio/next_level.mp3");
 
   SetTargetFPS(window.fps);
 
@@ -3061,7 +3205,7 @@ int main() {
       .current_frame_rec =
           (Rectangle){
               .width = trap.width, .height = trap.height, .x = 0, .y = 0},
-      .time_needed = 0.05,
+      .time_needed = 0.00000005,
       .time_passed = 0,
       .lower_bound =
           (Vector2){.x = 11 * tilemap.tileset->tile_width + 15,
@@ -3071,6 +3215,38 @@ int main() {
                     .y = 31 * tilemap.tileset->tile_height - trap.height},
       .speed = 1,
       .max_speed = 10,
+      .direction = 0
+
+  };
+
+  Trap trap_underworld = (Trap){
+
+      .width = 38,
+      .height = 38,
+      .damage = 1,
+      .position = (Vector2){.x = 29 * 32,
+                            .y = 67 * 32 - (trap_underworld.height / 2.0)},
+      .hitbox = (Rectangle){.width = trap_underworld.width,
+                            .height = trap_underworld.height,
+                            .x = trap_underworld.position.x,
+                            .y = trap_underworld.position.y},
+      .sprite_sheet = LoadTexture("resources/traps/saw.png"),
+      .frame_count = 10,
+      .current_frame_no = 1,
+      .current_frame_rec = (Rectangle){.width = trap_underworld.width,
+                                       .height = trap_underworld.height,
+                                       .x = 0,
+                                       .y = 0},
+      .time_needed = 0.00000005,
+      .time_passed = 0,
+      .lower_bound = (Vector2){.x = 30 * tilemap.tileset->tile_width,
+                               .y = 65 * tilemap.tileset->tile_height -
+                                    (trap_underworld.height / 2.0)},
+      .upper_bound = (Vector2){.x = 38 * tilemap.tileset->tile_width,
+                               .y = 65 * tilemap.tileset->tile_height -
+                                    (trap_underworld.height / 2.0)},
+      .speed = 1,
+      .max_speed = 5,
       .direction = 0
 
   };
@@ -3348,7 +3524,39 @@ int main() {
 
   };
 
+  Flag flag = (Flag){
+
+      .texture = LoadTexture("resources/other/flags/flag.png"),
+      .position = (Vector2){.x = 52 * 32, .y = 68 * 32},
+      .hurtbox =
+          (Rectangle){
+              .x = 52 * 32, .y = 68 * 32 - 24, .width = 16, .height = 24},
+      .frame_height = 24,
+      .frame_width = 16,
+      .frame_count = 10,
+      .current_frame_no = 1,
+      .time_passed = 0,
+      .time_needed = 0.1,
+      .current_frame_rec =
+          (Rectangle){.x = 0, .y = 0, .width = 16, .height = 24},
+
+  };
+
+  float frame_time = 0;
+
   while (!WindowShouldClose()) {
+
+
+    if (player_state.quest_1_complete > 0) {
+      player_state.quest_1_complete -= GetFrameTime();
+      menu = QUEST_1_MENU;
+
+      if (player_state.quest_1_complete <= 0) {
+        player_state.quest_1_complete = 0;
+        menu = GAME_MENU;
+      }
+
+    }
 
     if (menu == MAIN_MENU) {
       //  Draw phase
@@ -3398,7 +3606,8 @@ int main() {
         menu = GAME_MENU;
       }
     }
-    if (menu == OPTIONS_MENU) {
+
+    else if (menu == OPTIONS_MENU) {
       Rectangle btn = {300, 270, 200, 60};
       bool hover = CheckCollisionPointRec(GetMousePosition(), btn);
 
@@ -3428,7 +3637,43 @@ int main() {
 
       EndDrawing();
     }
-    if (menu == GAME_MENU) {
+
+    else if (menu == QUEST_1_MENU) {
+
+      BeginDrawing();
+      ClearBackground((Color){15, 17, 26, 128});
+
+      const char titleText[] = "QUEST 1";
+      const char titleText2[] = "COMPLETE";
+
+      float titleFontSize = 80.0;
+      float titleSpacing = 2.0;
+
+      Vector2 titleDim = MeasureTextEx(font_press_start, titleText,
+                                       titleFontSize, titleSpacing);
+      Vector2 titleDim2 = MeasureTextEx(font_press_start, titleText2,
+                                       titleFontSize, titleSpacing);
+
+      float titleX = (GetScreenWidth() - titleDim.x) / 2.0;
+      float titleY =
+                     GetScreenHeight() / 2.0 - titleDim.y;
+
+      float titleX2 = (GetScreenWidth() - titleDim2.x) / 2.0;
+      float titleY2 =
+                     GetScreenHeight() / 2.0 - titleDim2.y + titleFontSize;
+
+      DrawTextEx(font_press_start, titleText,
+                 (Vector2){.x = titleX, .y = titleY}, titleFontSize, 2,
+                 GREEN);
+
+      DrawTextEx(font_press_start, titleText2,
+                 (Vector2){.x = titleX2, .y = titleY2}, titleFontSize, 2,
+                 GREEN);
+
+      EndDrawing();
+    }
+
+    else if (menu == GAME_MENU) {
 
       if (!IsSoundPlaying(sound_nature)) {
         PlaySound(sound_nature);
@@ -3437,6 +3682,7 @@ int main() {
       Update(&player_state, &camera, &tilemap, &current_mode);
       UpdateFloaters(floaters, &player_state);
       UpdateTrap(&trap, &player_state, &death_scream);
+      UpdateTrapUnderworld(&trap_underworld, &player_state, &death_scream);
       UpdateGolem(&golem, &player_state, &death_scream, &sound_golem_attack);
       UpdateGolemR(&golemr, &player_state, &sound_golemr_collision);
       UpdateTrampoline(&trampoline, &player_state);
@@ -3460,8 +3706,21 @@ int main() {
 
       ClearBackground(RAYWHITE);
 
+#ifdef DEBUG
+
+      DrawRectangleRec(trap_underworld.hitbox, BLUE);
+
+#endif
+
+      DrawTrapUnderworld(&trap_underworld);
       DrawPlatform(&window, &platform, &tilemap, &player_state, floaters);
       DrawHP(&player_state);
+
+#ifdef DEBUG
+      DrawRectangleRec(flag.hurtbox, GREEN);
+#endif
+
+      HandleFlag(&flag, &player_state, &sound_next_level);
 
 #ifdef DEBUG
       DrawRectangleRec(trap.hitbox, BLUE);
@@ -3698,6 +3957,7 @@ int main() {
   UnloadSound(sound_bullet);
   UnloadSound(sound_bullet_hit);
   UnloadSound(sound_spear);
+  UnloadSound(sound_next_level);
 
   CloseAudioDevice();
 
@@ -3727,6 +3987,8 @@ int main() {
   UnloadTexture(trampoline.sprite);
   UnloadTexture(spear.sprite);
   UnloadTexture(trap.sprite_sheet);
+  UnloadTexture(trap_underworld.sprite_sheet);
+  UnloadTexture(flag.texture);
 
   UnloadTexture(golemr.golemr_walk.sprite);
   UnloadTexture(golemr.golemr_attack.sprite);
