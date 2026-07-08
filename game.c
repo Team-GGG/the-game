@@ -9,15 +9,24 @@
 #include <stdio.h>
 #endif
 
-
+typedef struct {
+  Texture2D texture;
+  bool active;
+  Vector2 position;
+  float time_passed;
+  float lifetime;
+  bool hit_player;
+  int frame_width;
+  int frame_height;
+} BossLaser;
 typedef enum {
 
   IDLE_BOSS,
-  GLOWING_BOSS,
+  LASERATTACK_BOSS,
   RANGEDATTACK_BOSS,
   DEFEND_BOSS,
   MELEEATTACK_BOSS,
-  LASERATTACK_BOSS,
+  GLOWING_BOSS,
   WALK_BOSS,
   SOMETHING_BOSS,
   DEATH_BOSS
@@ -2607,6 +2616,7 @@ void DrawBoss(Boss *boss, BossArm *arm) {
                              .height = boss->frame_height * 2}, 2.0f, RED);
   if (arm->active) {
 
+
      
 
     DrawTexturePro(arm->texture, (Rectangle){0.0f,0.0f, (float)arm->texture.width * (-1)*(boss->facing_direction), (float)arm ->texture.height},
@@ -2623,20 +2633,91 @@ void DrawBoss(Boss *boss, BossArm *arm) {
                                      .height = arm->frame_height},
                          1.5f, YELLOW);
 #endif
+
   }
+  if (boss->mode == LASERATTACK_BOSS){
+   //
+}}
+
+
+void DrawBossLaser(BossLaser *laser, Boss *boss) {
+  if ((laser->active) == 0){
+    return;
+  } 
+  float laser_beam_length    = 750.0f;
+  float laser_beam_thickness = 100.0f;
+
+  float dir = (boss->facing_direction == 1) ? 1.0f : -1.0f;
+  float frame_h = laser->texture.height / 14.0f;
+
+
+  Rectangle source = (Rectangle){0, frame_h * 13, (float)laser->texture.width * dir, frame_h};
+
+  Rectangle dest = (Rectangle){
+      .x = (dir > 0) ? laser->position.x : laser->position.x - laser_beam_length,
+      .y = laser->position.y - laser_beam_thickness / 2,
+      .width = laser_beam_length ,
+      .height = laser_beam_thickness};
+  
+  DrawTexturePro(laser->texture, source, dest, (Vector2){0, 0}, 0, WHITE);
 }
 
 
+void UpdateBossLaser(BossLaser *laser, Boss *boss, PlayerState *player_state) {
+
+  int laser_release_frame = boss->sprite_numbers[LASERATTACK_BOSS];
+
+  float dir = (boss->facing_direction == 1) ? 1.0f : -1.0f;
+
+  if (boss->mode == LASERATTACK_BOSS &&
+      boss->current_frame_no >= laser_release_frame &&
+      !laser->active) {
+
+    laser->active = true;
+    laser->time_passed = 0;
+    laser ->hit_player = false;
+
+  
+    laser->position = (Vector2){
+        .x = (dir > 0) ? boss->position.x + boss->frame_width * 2 - 150.0f
+                        : boss->position.x + 150.0f,
+        .y = boss->position.y - boss->frame_height * 2 + 50 +
+             boss->frame_height * 0.8f + 10};
+  }
+
+  if (!laser->active) return;
+
+  laser->time_passed += GetFrameTime();
+
+  if (laser->time_passed >= laser->lifetime) {
+    laser->active = false;
+    return;
+  }
+
+  float laser_beam_length    = 750.0f;
+  float laser_beam_thickness = 100.0f;
+
+  Rectangle laser_hitbox = (Rectangle){
+      .x = (dir > 0) ? laser->position.x : laser->position.x - laser_beam_length,
+      .y = laser->position.y - laser_beam_thickness / 2,
+      .width = laser_beam_length,
+      .height = laser_beam_thickness};
+    DrawRectangleLinesEx(laser_hitbox, 2.0f, RED);
+#ifdef DEBUG
+  DrawRectangleLinesEx(laser_hitbox, 20.0f, PURPLE);
+#endif
+
+  }
 
 void UpdateBossArm(BossArm *arm, Boss *boss, PlayerState *player_state) {
-  int  ARM_RELEASE_FRAME = 9 ;  // TODO: verify against your actual sprite sheet
-  float ARM_SPEED=  260.0f ;
-  float ARM_LIFETIME = 1.2f;
-  float  ARM_MAX_DISTANCE = 400.0f ;
+  int  arm_release_frame = 9 ;  
+  float arm_speed = 260.0f ;
+  float arm_lifetime = 1.2f;
+  float  arm_max_distance = 400.0f ;
 
   if (boss->mode == RANGEDATTACK_BOSS &&
-      boss->current_frame_no == ARM_RELEASE_FRAME &&
-      arm->last_boss_frame_no != ARM_RELEASE_FRAME &&
+      boss->current_frame_no == arm_release_frame &&
+      arm->last_boss_frame_no != arm_release_frame &&
       !arm->active) {
 
     arm->active = true;
@@ -2653,7 +2734,7 @@ void UpdateBossArm(BossArm *arm, Boss *boss, PlayerState *player_state) {
              boss->frame_height * 0.4f};
 
     arm->spawn_position = arm->position;
-    arm->velocity = (Vector2){.x = dir * ARM_SPEED, .y = 0};
+    arm->velocity = (Vector2){.x = dir * arm_speed, .y = 0};
   }
 
   arm->last_boss_frame_no = boss->current_frame_no;
@@ -2666,13 +2747,7 @@ void UpdateBossArm(BossArm *arm, Boss *boss, PlayerState *player_state) {
   arm->position.y += arm->velocity.y * GetFrameTime();
 
   arm->time_passed += GetFrameTime();
-  /*if (arm->anim_timer >= 0.08f) {
-    arm->anim_timer = 0;
-    arm->current_frame_no++;
-    if (arm->current_frame_no > arm->frame_count) {
-      arm->current_frame_no = 1;
-    }
-  }*/
+
 
   float traveled = diff(arm->position.x, arm->spawn_position.x);
 
@@ -2683,8 +2758,8 @@ void UpdateBossArm(BossArm *arm, Boss *boss, PlayerState *player_state) {
 
   bool hit_player = SimpleCollisionCheck(&arm_rec, player_state->player);
 
-  if (hit_player || traveled >= ARM_MAX_DISTANCE ||
-      arm->time_passed >= ARM_LIFETIME) {
+  if (hit_player || traveled >= arm_max_distance ||
+      arm->time_passed >= arm_lifetime) {
     arm->active = false;
     arm->time_passed = 0;
   }
@@ -2718,6 +2793,21 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
       
     }
   }
+   else if (boss -> mode == LASERATTACK_BOSS){
+     if (boss->state_timer >= 0){
+      boss->mode = LASERATTACK_BOSS;
+      boss->state_timer -= GetFrameTime();
+      if (boss->current_frame_no >= boss->sprite_numbers[LASERATTACK_BOSS]){
+        boss->current_frame_no = boss->sprite_numbers[LASERATTACK_BOSS];
+        boss->time_passed = 0.0;
+      }
+    }
+    else{
+      boss->state_timer = 0;
+      boss->mode = IDLE_BOSS;
+    }
+  }
+ 
   else if (boss->mode == RANGEDATTACK_BOSS ){
      if (boss->state_timer >= 0){
       boss->mode = RANGEDATTACK_BOSS;
@@ -2748,6 +2838,13 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
     boss->time_passed = 0.0 ;
     boss ->current_frame_no = 1;
     boss->state_timer = 2.5;
+
+  }
+  else if (IsKeyPressed(KEY_L)){
+    boss -> mode = LASERATTACK_BOSS;
+    boss -> time_passed = 0.0;
+    boss ->current_frame_no = 1;
+    boss ->state_timer = 0.9;
 
   }
   else if ((distance <= -10 && distance >= -200) && (distance_vertical <= 200 && distance_vertical >= -200)){
@@ -2914,6 +3011,10 @@ int main() {
       .frame_height = boss.frame_height,
       .frame_count = boss.sprite_numbers[RANGEDATTACK_BOSS],
       .last_boss_frame_no = 0};
+  BossLaser boss_laser = (BossLaser){
+      .texture = LoadTexture("resources/mob/boss/Laser_sheet.png"),
+      .active = false,
+      .lifetime = 0.3f};
 
   Camera2D camera = (Camera2D){
       .offset =
@@ -3393,6 +3494,7 @@ int main() {
       UpdateGolemR(&golemr, &player_state, &sound_golemr_collision);
       UpdateTrampoline(&trampoline, &player_state);
       UpdateClouds(clouds);
+      UpdateBossLaser(&boss_laser, &boss, &player_state);
       UpdateBoss(&boss, &player_state);
       UpdateBossArm(&boss_arm, &boss, &player_state);
 
@@ -3550,7 +3652,7 @@ int main() {
       }
       
       DrawBoss(&boss,&boss_arm);
-
+      DrawBossLaser(&boss_laser, &boss);
       EndMode2D();
 
       EndDrawing();
@@ -3676,5 +3778,6 @@ int main() {
   UnloadTexture(golemr.golemr_bullet_back.sprite);
   UnloadTexture(boss.texture);
   UnloadTexture(boss_arm.texture);
+  UnloadTexture(boss_laser.texture);
   CloseWindow();
 }
