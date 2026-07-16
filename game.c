@@ -2663,7 +2663,7 @@ void DrawBossLaser(BossLaser *laser, Boss *boss) {
 }
 
 
-void UpdateBossLaser(BossLaser *laser, Boss *boss, PlayerState *player_state) {
+void UpdateBossLaser(BossLaser *laser, Boss *boss, PlayerState *player_state, Sound *sound_laser) {
 
   int laser_release_frame = boss->sprite_numbers[LASERATTACK_BOSS];
 
@@ -2672,10 +2672,11 @@ void UpdateBossLaser(BossLaser *laser, Boss *boss, PlayerState *player_state) {
   if (boss->mode == LASERATTACK_BOSS &&
       boss->current_frame_no >= laser_release_frame &&
       !laser->active) {
-
+    
     laser->active = true;
     laser->time_passed = 0;
     laser ->hit_player = false;
+    PlaySound(*sound_laser);
 
   
     laser->position = (Vector2){
@@ -2867,7 +2868,7 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
   else{
     boss->mode = IDLE_BOSS;
   }
-  printf("Boss Mode: %d | Frame: %d | Pos X: %f\n", boss->mode, boss->current_frame_no, boss->position.x);
+  //printf("Boss Mode: %d | Frame: %d | Pos X: %f\n", boss->mode, boss->current_frame_no, boss->position.x);
 
 }
 
@@ -3079,7 +3080,8 @@ int main() {
   InitAnimationStates(animation_states);
 
   InitAudioDevice();
-
+  Sound sound_lasercharge = LoadSound("resources/audio/laser_charge.mp3");
+  Sound sound_laser = LoadSound("resources/audio/sound_laser.mp3");
   Sound sound_walking = LoadSound("resources/audio/running_in_grass.mp3");
   Sound death_scream = LoadSound("resources/audio/death_scream.mp3");
   Sound sound_jump = LoadSound("resources/audio/jump.mp3");
@@ -3494,7 +3496,7 @@ int main() {
       UpdateGolemR(&golemr, &player_state, &sound_golemr_collision);
       UpdateTrampoline(&trampoline, &player_state);
       UpdateClouds(clouds);
-      UpdateBossLaser(&boss_laser, &boss, &player_state);
+      UpdateBossLaser(&boss_laser, &boss, &player_state, &sound_laser);
       UpdateBoss(&boss, &player_state);
       UpdateBossArm(&boss_arm, &boss, &player_state);
 
@@ -3729,7 +3731,7 @@ int main() {
   }
 
   StopSound(sound_nature);
-
+  UnloadSound(sound_laser);
   UnloadSound(sound_walking);
   UnloadSound(death_scream);
   UnloadSound(sound_jump);
