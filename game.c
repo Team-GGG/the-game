@@ -3,11 +3,63 @@
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #define DEBUG
 
 #ifdef DEBUG
 #include <stdio.h>
 #endif
+
+typedef struct{
+  float time;
+  char name[15];
+} Score;
+typedef struct{
+  Score people[10];
+  int count;
+} Scoreboard;
+
+void ScoreWrite(Scoreboard *board){
+  FILE *f = fopen("Score.bin","wb");
+  if (f != NULL){
+    fwrite(board, sizeof(Scoreboard),1,f);
+    fclose(f);
+  }
+}
+
+void ScoreRead(Scoreboard *board){
+  FILE *f = fopen("Score.bin","rb");
+  if ( f !=  NULL){
+    fread(board, sizeof(Scoreboard), 1, f);
+    fclose(f);
+  }
+}
+void ScoreAdd(Scoreboard *board, float time, char name[]){
+  if ( board->count >0 && board->count == 10 && time >= board->people[board->count-1].time ){
+    return ;
+  }
+  int index = 0 ;
+  while (index < board->count  && board->people[index].time < time ){
+    index ++ ;
+}
+  int limit;  
+  if (board->count < 10){
+    limit = board->count;
+  }
+  else{
+    limit = 9;
+  }
+  for (int i = limit ; i>index ; i--){
+    board->people[i] = board->people[i-1];
+  }
+  strcpy(board->people[index].name, name);
+  board->people[index].time = time;
+  if (board->count < 10){
+    board->count++;
+  }
+}
+
+
 
 typedef struct {
   Texture2D texture;
@@ -84,6 +136,8 @@ typedef enum {
   GAME_MENU, 
   DEATH_MENU,
   HELP_MENU,
+  SCOREBOARD_MENU,
+  INPUT_MENU,
   OPTIONS_MENU } Menus;
 
 typedef struct {
@@ -2873,6 +2927,14 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
 }
 
 int main() {
+  Scoreboard board = {0};
+  char buffer[15] = {0};
+  int length_of_name = 0;
+  float speedrun_time = 0;
+  
+
+
+
   Menus menu = MAIN_MENU;
 
   WindowState window = (WindowState){.width = 1600, .height = 896, .fps = 60};
@@ -2880,6 +2942,7 @@ int main() {
 
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   InitWindow(window.width, window.height, "GGG");
+  ScoreRead(&board);
 
   Texture2D bg1 = LoadTexture("resources/bg/bg1.png");
 
@@ -3391,6 +3454,8 @@ int main() {
   while (!WindowShouldClose()) {
 
     if (menu == MAIN_MENU) {
+      speedrun_time = 0;
+      StopSound(sound_nature);
       //  Draw phase
       BeginDrawing();
       // Clean, dark minimalist background
@@ -3483,10 +3548,100 @@ int main() {
     if (menu == HELP_MENU){
       
     }
+    if (menu == SCOREBOARD_MENU){
+    BeginDrawing();
+    ClearBackground((Color){20, 20, 30, 255});
+    printf("board.count = %d\n", board.count);
+    int screenW = GetScreenWidth();
+
+    const char *title = "SCOREBOARD";
+    Vector2 titleDim = MeasureTextEx(font_press_start, title, 44, 2);
+    DrawTextEx(font_press_start, title, (Vector2){(screenW - titleDim.x) / 2, 60}, 44, 2, SKYBLUE);
+
+    float rowHeight = 42;
+    float startY = 160;
+    float boxWidth = 420;
+    float boxX = (screenW - boxWidth) / 2.0f;
+
+    for (int i = 0; i < board.count; i++){
+        Rectangle row = { boxX, startY + i * rowHeight, boxWidth, rowHeight - 6 };
+
+        Color rowColor = (i == 0) ? (Color){45, 45, 30, 255} : (Color){35, 35, 50, 255};
+        Color textColor = (i == 0) ? YELLOW : WHITE;
+
+        DrawRectangleRec(row, rowColor);
+        DrawRectangleLinesEx(row, 1, SKYBLUE);
+
+        char timeStr[16];
+        int total = (int)board.people[i].time;
+        snprintf(timeStr, sizeof(timeStr), "%d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60);
+
+        DrawTextEx(font_jetbrains_mono, TextFormat("%d.", i + 1), (Vector2){row.x + 12, row.y + 8}, 22, 1, LIGHTGRAY);
+        DrawTextEx(font_jetbrains_mono, board.people[i].name, (Vector2){row.x + 50, row.y + 8}, 22, 1, textColor);
+        DrawTextEx(font_jetbrains_mono, timeStr, (Vector2){row.x + boxWidth - 110, row.y + 8}, 22, 1, textColor);
+    }
+
+    const char *hint = "Press ENTER to return";
+    Vector2 hintDim = MeasureTextEx(font_jetbrains_mono, hint, 18, 1);
+    DrawTextEx(font_jetbrains_mono, hint, (Vector2){(screenW - hintDim.x) / 2, startY + board.count * rowHeight + 30}, 18, 1, (Color){110, 115, 130, 255});
+
+    EndDrawing();
+
+    if (IsKeyPressed(KEY_ENTER)){
+        menu = MAIN_MENU;
+    }
+}
+    if (menu == INPUT_MENU){
+    BeginDrawing();
+    ClearBackground((Color){20, 20, 30, 255});
+
+    int ch = GetCharPressed();
+    while (ch > 0){
+        if (ch >= 32 && ch <= 125 && ch != ' ' && length_of_name < 14){
+            buffer[length_of_name++] = (char)ch;
+            buffer[length_of_name] = '\0';
+        }
+        ch = GetCharPressed();
+    }
+
+    if (IsKeyPressed(KEY_BACKSPACE) && length_of_name > 0){
+        buffer[--length_of_name] = '\0';
+    }
+
+    int screenW = GetScreenWidth();
+
+    const char *timeText = TextFormat("Your time: %.2fs", speedrun_time);
+    Vector2 timeDim = MeasureTextEx(font_press_start, timeText, 30, 2);
+    DrawTextEx(font_press_start, timeText, (Vector2){(screenW - timeDim.x) / 2, 120}, 30, 2, YELLOW);
+
+    const char *prompt = "Enter your name:";
+    Vector2 promptDim = MeasureTextEx(font_jetbrains_mono, prompt, 24, 1);
+    DrawTextEx(font_jetbrains_mono, prompt, (Vector2){(screenW - promptDim.x) / 2, 190}, 24, 1, LIGHTGRAY);
+
+    Rectangle box = { (screenW - 320) / 2.0f, 230, 320, 50 };
+    DrawRectangleRec(box, (Color){35, 35, 50, 255});
+    DrawRectangleLinesEx(box, 2, SKYBLUE);
+    DrawTextEx(font_jetbrains_mono, buffer, (Vector2){box.x + 12, box.y + 12}, 26, 1, WHITE);
+
+    EndDrawing();
+
+    if (IsKeyPressed(KEY_ENTER) && length_of_name > 0){
+        ScoreAdd(&board, speedrun_time, buffer);
+        ScoreWrite(&board);
+        menu = MAIN_MENU;
+    }
+}
     if (menu == GAME_MENU) {
 
       if (!IsSoundPlaying(sound_nature)) {
         PlaySound(sound_nature);
+      }
+      speedrun_time += GetFrameTime();
+      if (IsKeyPressed(KEY_Y)){
+        menu = SCOREBOARD_MENU;
+      }
+      if (IsKeyPressed(KEY_X)){
+        menu = INPUT_MENU;
       }
 
       Update(&player_state, &camera, &tilemap, &current_mode);
@@ -3667,7 +3822,7 @@ int main() {
     }
 
     if (player_state.hp <= 0) {
-
+      speedrun_time = 0;
       if (!player_state.death_sound) {
         PlaySound(death_scream);
         player_state.death_sound = true;
