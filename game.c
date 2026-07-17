@@ -13,6 +13,7 @@
 #include <stdio.h>
 #endif
 
+int quest1_complete = 0;
 typedef struct {
 
   Texture2D texture;
@@ -3428,6 +3429,8 @@ void HandleFlag(Flag *flag, PlayerState *player_state, Sound *next_level) {
 
   if (SimpleCollisionCheck(player_state->player, &flag->hurtbox)) {
     player_state->quest_1_complete = 2;
+    quest1_complete = 1;
+    
     player_state->level = 2;
 
     player_state->player->x = 0;
@@ -3438,6 +3441,7 @@ void HandleFlag(Flag *flag, PlayerState *player_state, Sound *next_level) {
 }
 
 int main() {
+  
 
   srand(time(NULL));
 
@@ -4623,7 +4627,9 @@ int main() {
     }
 
     if (player_state.hp <= 0) {
-      speedrun_time = 0;
+      if(!quest1_complete){
+        speedrun_time = 0;
+      }
       if (!player_state.death_sound) {
         PlaySound(death_scream);
         player_state.death_sound = true;
