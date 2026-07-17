@@ -3245,7 +3245,7 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
       boss->mode = LASERATTACK_BOSS;
       boss->time_passed = 0.0;
       boss->current_frame_no = 1;
-      boss->state_timer = 0.9;
+      boss->state_timer = 1;
       boss->in_attack = true;
       boss->attack_count--;
     }
@@ -3259,6 +3259,7 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
       boss->time_passed = 0.0;
       boss->current_frame_no = 1;
       boss->state_timer = 2.5;
+      boss->in_attack = true;
     }
   }
 
@@ -3513,7 +3514,7 @@ int main() {
                                         .height = 71 * tileset.tile_height};
 
   Rectangle player =
-      (Rectangle){.x = 0, .y = 66 * 32, .width = 32, .height = 64};
+      (Rectangle){.x = 1200, .y =  0 * 32, .width = 32, .height = 64};
   PlayerState player_state = (PlayerState){
       .player = &player,
       .speed = 5.7,
@@ -3590,7 +3591,7 @@ int main() {
              .current_frame_no = 1,
              .current_frame_rec =
                  (Rectangle){.x = 0, .y = 0, .width = 100, .height = 100},
-             .time_needed = {0.2, 0.1, 0.1, 0.1, 0.05, 0.1, 0.1, 0.1, 0.1},
+             .time_needed = {0.2, 0.13, 0.1, 0.1, 0.05, 0.1, 0.1, 0.1, 0.1},
              .state_timer = 0.0f,
              .time_passed = 0.1,
              .facing_direction = 1,
