@@ -35,7 +35,7 @@ void ScoreRead(Scoreboard *board){
   }
 }
 void ScoreAdd(Scoreboard *board, float time, char name[]){
-  if ( board->count >0 && board->count == 10 && time >= board->people[board->count-1].time ){
+  if (board->count == 10 && (time > board->people[10-1].time) ){
     return ;
   }
   int index = 0 ;
@@ -2927,6 +2927,7 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
 }
 
 int main() {
+  int should_exit = 1;
   Scoreboard board = {0};
   char buffer[15] = {0};
   int length_of_name = 0;
@@ -3143,6 +3144,7 @@ int main() {
   InitAnimationStates(animation_states);
 
   InitAudioDevice();
+  Sound sound_hover = LoadSound("resources/audio/hover.mp3");
   Sound sound_lasercharge = LoadSound("resources/audio/laser_charge.mp3");
   Sound sound_laser = LoadSound("resources/audio/sound_laser.mp3");
   Sound sound_walking = LoadSound("resources/audio/running_in_grass.mp3");
@@ -3451,7 +3453,9 @@ int main() {
           (Rectangle){.x = 0, .y = 0, .width = 28, .height = 28},
   };
 
-  while (!WindowShouldClose()) {
+  int sound_played = 1;
+
+  while (!WindowShouldClose() && should_exit) {
 
     if (menu == MAIN_MENU) {
       speedrun_time = 0;
@@ -3500,58 +3504,96 @@ int main() {
 
       EndDrawing();
       if (IsKeyPressed(KEY_ENTER)) {
-        menu = GAME_MENU;
-                            ;
+        menu = OPTIONS_MENU;
+                            
       }
     }
     if (menu == OPTIONS_MENU){
-      Rectangle btn = { 1100, 80, 400, 120 };
-      Rectangle btn_help = {1100, 300 , 400 , 120}; 
-        bool hover = CheckCollisionPointRec(GetMousePosition(), btn);
-        bool hover_help = CheckCollisionPointRec(GetMousePosition(),btn_help);
-        
-        if (hover) {
-            btn = (Rectangle){ btn_help.x - 4, btn_help.y - 2, btn_help.width + 8, btn_help.height + 4 };
+
+      Vector2 mouse = GetMousePosition();
+
+      float btnWidth  = 400;
+      float btnHeight = 60;
+      float btnGap    = 30;
+      float btnX      = (GetScreenWidth() - btnWidth) / 2.0f;
+      float startY    = GetScreenHeight() / 2.0f - 30;
+
+      Rectangle btnPlay        = { btnX, startY,                            btnWidth, btnHeight };
+      Rectangle btnLeaderboard = { btnX, startY + (btnHeight + btnGap),     btnWidth, btnHeight };
+      Rectangle btnHelp        = { btnX, startY + 2 * (btnHeight + btnGap), btnWidth, btnHeight };
+      Rectangle btnExit        = { btnX, startY + 3 * (btnHeight + btnGap), btnWidth, btnHeight };
+
+      bool hoverPlay        = CheckCollisionPointRec(mouse, btnPlay);
+      bool hoverLeaderboard = CheckCollisionPointRec(mouse, btnLeaderboard);
+      bool hoverHelp        = CheckCollisionPointRec(mouse, btnHelp);
+      bool hoverExit        = CheckCollisionPointRec(mouse, btnExit);
+      
+      if (hoverPlay || hoverLeaderboard || hoverHelp || hoverExit){
+        if (!IsSoundPlaying(sound_hover) && sound_played){
+          PlaySound(sound_hover);
+          sound_played = 0;
         }
-         if (hover_help) {
-            btn = (Rectangle){ btn_help.x - 4, btn_help.y - 2, btn_help.width + 8, btn_help.height + 4 };
-        }
-       
-        
-
-        BeginDrawing();
-            ClearBackground((Color){15, 17, 26, 128});
-
-            DrawRectangleRec(btn, hover ? (Color){40, 50, 75, 230} : (Color){25, 30, 45, 200});
-            DrawRectangleLinesEx(btn, hover ? 3.0f : 2.0f, (Color){0, 180, 216, 255});
-            DrawRectangleRec(btn_help, hover_help ? (Color){40, 50, 75, 230} : (Color){25, 30, 45, 200});
-            DrawRectangleLinesEx(btn_help, hover_help ? 3.0f : 2.0f, (Color){0, 180, 216, 255});
-
-            // 2. Measure and draw using your loaded font
-            float fontSize = hover ? 48.0f : 44.0f;
-            float spacing = 2.0f; // Space between letters
-            
-            Vector2 textSize = MeasureTextEx(font_press_start, "HELP", fontSize, spacing);
-            
-            
-            // DrawTextEx allows you to pass your custom font structure
-            DrawTextEx(font_press_start, "PLAY", 
-                       (Vector2){ btn.x + (btn.width - textSize.x) / 2, btn.y + (btn.height - textSize.y) / 2 }, 
-                       fontSize, spacing, WHITE);            
-          
-                       
-        EndDrawing();
-      if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
-        menu = GAME_MENU;
       }
-    }
+      else{
+        sound_played = 1;
+      }     
+        
+
+      if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+        if (hoverPlay)        { menu = GAME_MENU; }
+        if (hoverLeaderboard) { menu = SCOREBOARD_MENU; }
+        if (hoverHelp)        { menu = HELP_MENU; }
+        if (hoverExit)        { should_exit = 0; }
+      }
+
+      BeginDrawing();
+      ClearBackground((Color){15, 17, 26, 128});
+        Vector2 TitleDim = MeasureTextEx(font_press_start, "HOLLOW",
+                                       100, 2);
+        DrawTextEx(font_press_start, "HOLLOW",
+                 (Vector2){.x = (GetScreenWidth()-TitleDim.x)/2 , .y = TitleDim.y-15}, 100.0, 2,
+                 SKYBLUE);
+
+        DrawRectangleRec(btnPlay, hoverPlay ? (Color){60,65,90,255} : (Color){35,35,50,255});
+        DrawRectangleLinesEx(btnPlay, 2, hoverPlay ? YELLOW : SKYBLUE);
+        Vector2 playDim = MeasureTextEx(font_jetbrains_mono, "Play Game", 26, 1);
+        DrawTextEx(font_jetbrains_mono, "Play Game",
+                   (Vector2){btnPlay.x + (btnPlay.width - playDim.x)/2.0f, btnPlay.y + (btnPlay.height - playDim.y)/2.0f},
+                   26, 1, hoverPlay ? YELLOW : WHITE);
+
+        DrawRectangleRec(btnLeaderboard, hoverLeaderboard ? (Color){60,65,90,255} : (Color){35,35,50,255});
+        DrawRectangleLinesEx(btnLeaderboard, 2, hoverLeaderboard ? YELLOW : SKYBLUE);
+        Vector2 lbDim = MeasureTextEx(font_jetbrains_mono, "Leaderboard", 26, 1);
+        DrawTextEx(font_jetbrains_mono, "Leaderboard",
+                   (Vector2){btnLeaderboard.x + (btnLeaderboard.width - lbDim.x)/2.0f, btnLeaderboard.y + (btnLeaderboard.height - lbDim.y)/2.0f},
+                   26, 1, hoverLeaderboard ? YELLOW : WHITE);
+
+        DrawRectangleRec(btnHelp, hoverHelp ? (Color){60,65,90,255} : (Color){35,35,50,255});
+        DrawRectangleLinesEx(btnHelp, 2, hoverHelp ? YELLOW : SKYBLUE);
+        Vector2 helpDim = MeasureTextEx(font_jetbrains_mono, "Help", 26, 1);
+        DrawTextEx(font_jetbrains_mono, "Help",
+                   (Vector2){btnHelp.x + (btnHelp.width - helpDim.x)/2.0f, btnHelp.y + (btnHelp.height - helpDim.y)/2.0f},
+                   26, 1, hoverHelp ? YELLOW : WHITE);
+
+        DrawRectangleRec(btnExit, hoverExit ? (Color){60,65,90,255} : (Color){35,35,50,255});
+        DrawRectangleLinesEx(btnExit, 2, hoverExit ? YELLOW : SKYBLUE);
+        Vector2 exitDim = MeasureTextEx(font_jetbrains_mono, "Exit", 26, 1);
+        DrawTextEx(font_jetbrains_mono, "Exit",
+                   (Vector2){btnExit.x + (btnExit.width - exitDim.x)/2.0f, btnExit.y + (btnExit.height - exitDim.y)/2.0f},
+                   26, 1, hoverExit ? YELLOW : WHITE);
+
+        EndDrawing();
+        }
+      
+     
+      
     if (menu == HELP_MENU){
       
     }
     if (menu == SCOREBOARD_MENU){
     BeginDrawing();
     ClearBackground((Color){20, 20, 30, 255});
-    printf("board.count = %d\n", board.count);
+    //printf("board.count = %d\n", board.count);
     int screenW = GetScreenWidth();
 
     const char *title = "SCOREBOARD";
@@ -3564,7 +3606,7 @@ int main() {
     float boxX = (screenW - boxWidth) / 2.0f;
 
     for (int i = 0; i < board.count; i++){
-        Rectangle row = { boxX, startY + i * rowHeight, boxWidth, rowHeight - 6 };
+        Rectangle row = { boxX, startY + i * rowHeight, boxWidth, rowHeight -6 };
 
         Color rowColor = (i == 0) ? (Color){45, 45, 30, 255} : (Color){35, 35, 50, 255};
         Color textColor = (i == 0) ? YELLOW : WHITE;
@@ -3588,7 +3630,7 @@ int main() {
     EndDrawing();
 
     if (IsKeyPressed(KEY_ENTER)){
-        menu = MAIN_MENU;
+        menu = OPTIONS_MENU;
     }
 }
     if (menu == INPUT_MENU){
@@ -3609,7 +3651,7 @@ int main() {
     }
 
     int screenW = GetScreenWidth();
-
+  
     const char *timeText = TextFormat("Your time: %.2fs", speedrun_time);
     Vector2 timeDim = MeasureTextEx(font_press_start, timeText, 30, 2);
     DrawTextEx(font_press_start, timeText, (Vector2){(screenW - timeDim.x) / 2, 120}, 30, 2, YELLOW);
@@ -3886,6 +3928,7 @@ int main() {
   }
 
   StopSound(sound_nature);
+  UnloadSound(sound_hover);
   UnloadSound(sound_laser);
   UnloadSound(sound_walking);
   UnloadSound(death_scream);
