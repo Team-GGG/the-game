@@ -3239,6 +3239,8 @@ void HandleFlag(Flag *flag, PlayerState *player_state, Sound* next_level) {
 }
 
 int main() {
+  int is_transitioning = 0;
+  float transition_timer = 0;
   int should_exit = 1;
   Scoreboard board = {0};
   char buffer[15] = {0};
@@ -3854,6 +3856,30 @@ int main() {
       }
 
     }
+    if (is_transitioning){
+      transition_timer += GetFrameTime();
+      printf("%d",transition_timer);
+      printf("%d",is_transitioning);
+      
+      if (transition_timer < 0.5){
+      
+        float laserY = (GetScreenHeight() / 2.0f) - 200.0f; 
+        float laserHeight = 200.0f; 
+        Rectangle source = (Rectangle){0, (boss_laser.texture.height * 13 / (float)14), (float)boss_laser.texture.width * (-1), boss_laser.texture.height / 14.0f };
+        Rectangle dest = (Rectangle){0,laserY,((float)GetScreenWidth()+400)*(transition_timer)*2,laserHeight};
+        DrawTexturePro(boss_laser.texture,source,dest,(Vector2){0,0},0,WHITE);
+      
+
+        
+        
+      }
+      else{
+        is_transitioning = 0;
+        transition_timer = 0;
+        menu = GAME_MENU;
+      }
+    }
+    
 
     if (menu == MAIN_MENU) {
       speedrun_time = 0;
@@ -3900,6 +3926,7 @@ int main() {
       }
     }
    else if (menu == OPTIONS_MENU){
+      
 
       Vector2 mouse = GetMousePosition();
 
@@ -3931,7 +3958,10 @@ int main() {
 
 
       if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
-        if (hoverPlay)        { menu = GAME_MENU; }
+        if (hoverPlay){ 
+          is_transitioning = 1;
+          PlaySound(sound_laser);
+        }
         if (hoverLeaderboard) { menu = SCOREBOARD_MENU; }
         if (hoverHelp)        { menu = HELP_MENU; }
         if (hoverExit)        { should_exit = 0; }
@@ -3939,6 +3969,7 @@ int main() {
       //if (IsKeyPressed(KEY_ENTER)){
         //menu = GAME_MENU;
       //} 
+      
 
       BeginDrawing();
       ClearBackground((Color){15, 17, 26, 128});
@@ -3982,7 +4013,7 @@ int main() {
 
 
     if (menu == HELP_MENU){
-      float transition_time = 1.0f;
+      
       BeginDrawing();
       Vector2 ControlDim = MeasureTextEx(font_press_start,"CONTROLS",70,2);
       DrawTextEx(font_press_start,"CONTROLS",(Vector2){(GetScreenWidth()-ControlDim.x)/2,60},70,2,SKYBLUE);
@@ -4087,7 +4118,7 @@ int main() {
     if (IsKeyPressed(KEY_ENTER) && length_of_name > 0){
         ScoreAdd(&board, speedrun_time, buffer);
         ScoreWrite(&board);
-        menu = MAIN_MENU;
+        menu = GAME_MENU;
     }
 }
     if (menu == GAME_MENU) {
