@@ -3,15 +3,37 @@
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <time.h>
-
-// #define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #include <stdio.h>
 #endif
+
+#define FRUIT_PATH "resources/fruits/fruits.png"
+#define delta_hp_fruit 0.1f
+
+#define MAX_FRUITS 10
+
+typedef struct {
+  Vector2 position;
+  Texture2D texture;
+  bool active;
+} Fruit;
+
+Fruit fruitPool[MAX_FRUITS] = { 0 }; // Sets all active states to false initially
+
+void SpawnFruit(Vector2 position) {
+    for (int i = 0; i < MAX_FRUITS; i++) {
+        if (!fruitPool[i].active) {
+            fruitPool[i].position.x = position.x;
+            fruitPool[i].position.y = position.y;
+            //fruitPool[i].position = position;
+            fruitPool[i].active = true;
+            break; // Spawned one, stop looking
+        }
+    }
+}
 
 typedef struct {
 
@@ -31,15 +53,57 @@ typedef struct {
 
 } Flag;
 
-typedef struct {
+typedef struct{
   float time;
   char name[15];
 } Score;
 
-typedef struct {
+typedef struct{
   Score people[10];
   int count;
 } Scoreboard;
+
+void ScoreWrite(Scoreboard *board){
+  FILE *f = fopen("Score.bin","wb");
+  if (f != NULL){
+    fwrite(board, sizeof(Scoreboard),1,f);
+    fclose(f);
+  }
+}
+
+void ScoreRead(Scoreboard *board){
+  FILE *f = fopen("Score.bin","rb");
+  if ( f !=  NULL){
+    fread(board, sizeof(Scoreboard), 1, f);
+    fclose(f);
+  }
+}
+void ScoreAdd(Scoreboard *board, float time, char name[]){
+  if ( board->count >0 && board->count == 10 && time >= board->people[board->count-1].time ){
+    return ;
+  }
+  int index = 0 ;
+  while (index < board->count  && board->people[index].time < time ){
+    index ++ ;
+}
+  int limit;
+  if (board->count < 10){
+    limit = board->count;
+  }
+  else{
+    limit = 9;
+  }
+  for (int i = limit ; i>index ; i--){
+    board->people[i] = board->people[i-1];
+  }
+  strcpy(board->people[index].name, name);
+  board->people[index].time = time;
+  if (board->count < 10){
+    board->count++;
+  }
+}
+
+
 
 typedef struct {
   Texture2D texture;
@@ -51,7 +115,6 @@ typedef struct {
   int frame_width;
   int frame_height;
 } BossLaser;
-
 typedef enum {
 
   IDLE_BOSS,
@@ -78,18 +141,12 @@ typedef struct {
   int sprite_numbers[9];
   int frame_width;
   int frame_height;
-  int lower_bound;
-  int attack_count;
-  int in_attack;
 
   int facing_direction; // changed back to int , 1 means right , -1 means left
                         // or something;
 
   float time_passed;
-  float no_melee;
-  float no_laser;
   float speed;
-  float hp;
   float time_needed[9];
   float state_timer; // It was getting too complicated for me personally to work
                      // with time_passed for updating boss, was messing up the
@@ -109,15 +166,17 @@ typedef struct {
   Vector2 spawn_position;
   Vector2 velocity;
 
+
   float time_passed;
+
+
+
 
   int frame_width;
   int frame_height;
   int frame_count;
 
   int last_boss_frame_no;
-
-  Rectangle arm_rec;
 
 } BossArm;
 
@@ -130,7 +189,8 @@ typedef enum {
   INPUT_MENU,
   OPTIONS_MENU,
   QUEST_1_MENU
-} Menus;
+
+  } Menus;
 
 typedef struct {
 
@@ -176,7 +236,6 @@ typedef struct {
   int attack_light_current_frame_no;
   int attack_heavy_current_frame_no;
   int jump_left;
-  int level;
 
   float speed;
   float gravity;
@@ -206,7 +265,6 @@ typedef struct {
   bool is_being_hit;
   bool death_sound;
   bool camera_shake;
-  bool in_collision_with_boss;
 
   Texture2D attack_light_sprite;
   Texture2D attack_light_sprite_back;
@@ -392,6 +450,7 @@ typedef struct {
 
 typedef enum { TRAMPOLINE_IDLE, TRAMPOLINE_ACTIVE } TrampolineMode;
 
+
 typedef struct {
 
   TrampolineMode mode;
@@ -446,45 +505,6 @@ typedef struct {
   Rectangle hitbox;
 
 } Spear;
-
-void ScoreWrite(Scoreboard *board) {
-  FILE *f = fopen("Score.bin", "wb");
-  if (f != NULL) {
-    fwrite(board, sizeof(Scoreboard), 1, f);
-    fclose(f);
-  }
-}
-
-void ScoreRead(Scoreboard *board) {
-  FILE *f = fopen("Score.bin", "rb");
-  if (f != NULL) {
-    fread(board, sizeof(Scoreboard), 1, f);
-    fclose(f);
-  }
-}
-void ScoreAdd(Scoreboard *board, float time, char name[]) {
-  if (board->count == 10 && (time > board->people[10 - 1].time)) {
-    return;
-  }
-  int index = 0;
-  while (index < board->count && board->people[index].time < time) {
-    index++;
-  }
-  int limit;
-  if (board->count < 10) {
-    limit = board->count;
-  } else {
-    limit = 9;
-  }
-  for (int i = limit; i > index; i--) {
-    board->people[i] = board->people[i - 1];
-  }
-  strcpy(board->people[index].name, name);
-  board->people[index].time = time;
-  if (board->count < 10) {
-    board->count++;
-  }
-}
 
 float diff(float a, float b) { return ((a - b > 0) ? (a - b) : (b - a)); }
 
@@ -579,11 +599,11 @@ bool CollisionResponse(TileInformation *tile_info, PlayerState *player_state,
     else if (left && up && !down && !right) {
 
       if (((player_state->player->y + player_state->player->height) >=
-           (tile_info->rec->y + tile_info->rec->height - buffer)) &&
+           (tile_info->rec->y + tile_info ->rec->height - buffer)) &&
           ((player_state->player->x) <
            (tile_info->rec->x + tile_info->rec->width - 15))) {
-        player_state->player->y = tile_info->rec->y + tile_info->rec->height +
-                                  player_state->player->height + y_push_back;
+        player_state->player->y =
+            tile_info->rec->y + tile_info->rec->height + player_state->player->height + y_push_back;
       }
 
       else {
@@ -597,14 +617,16 @@ bool CollisionResponse(TileInformation *tile_info, PlayerState *player_state,
     else if (right && up && !down && !left) {
 
       if (((player_state->player->y + player_state->player->height) >=
-           (tile_info->rec->y + tile_info->rec->height - buffer)) &&
-          ((player_state->player->x) < (tile_info->rec->x + 15))) {
-        player_state->player->y = tile_info->rec->y + tile_info->rec->height +
-                                  player_state->player->height + y_push_back;
+           (tile_info->rec->y + tile_info ->rec->height - buffer)) &&
+          ((player_state->player->x) <
+           (tile_info->rec->x + 15))) {
+        player_state->player->y =
+            tile_info->rec->y + tile_info->rec->height + player_state->player->height + y_push_back;
       }
 
       else {
-        player_state->player->x = tile_info->rec->x - x_push_back;
+        player_state->player->x =
+            tile_info->rec->x - x_push_back;
 
         player_state->player->y += player_state->sliding_speed;
       }
@@ -1156,12 +1178,14 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
     *mode = player_state->last_direction ? (IDLE) : (IDLE_LEFT);
   }
 
-  // if (!player_state->is_grounded && IsKeyDown(KEY_S) &&
-  //     !player_state->in_attack_light && !player_state->in_attack_heavy) {
-  //   player_state->gravity *= 1.5;
-  // }
+  if (!player_state->is_grounded && IsKeyDown(KEY_S) &&
+      !player_state->in_attack_light && !player_state->in_attack_heavy) {
+    player_state->gravity *= 1.5;
+  }
 
-  // KEY_S has some bug with it and it's unnecessary imo
+  else {
+    player_state->gravity = 1.5;
+  }
 
 #ifdef DEBUG
 
@@ -1621,7 +1645,7 @@ void DrawHP(PlayerState *player_state) {
 
 void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
                        MobGolem *golem, Sound *sound_golem_hit,
-                       MobGolemR *golemr, Boss *boss) {
+                       MobGolemR *golemr) {
 
   if (player_state->is_being_hit) {
     player_state->in_attack_light = false;
@@ -1735,17 +1759,6 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
     }
   }
 
-  if (player_state->is_attack_hit &&
-      SimpleCollisionCheck(&hitbox, &boss->hurtbox)) {
-    boss->hp -= player_state->attack_light_damage *
-                (boss->mode == DEFEND_BOSS ? .5 : .2);
-    player_state->is_attack_hit = 0;
-
-    if (boss->hp > 0) {
-      PlaySound(*sound_golem_hit);
-    }
-  }
-
   // if (golem->hp > 0) {
   //   PlaySound(*sound_golem_hit);
   // }
@@ -1754,7 +1767,7 @@ void HandleAttackLight(PlayerState *player_state, Sound *sound_attack_light,
 
 void HandleAttackHeavy(PlayerState *player_state, Sound *sound_attack_heavy,
                        MobGolem *golem, Sound *sound_golem_hit,
-                       MobGolemR *golemr, Boss *boss) {
+                       MobGolemR *golemr) {
 
   if (player_state->is_being_hit) {
     player_state->in_attack_heavy = false;
@@ -1877,19 +1890,6 @@ void HandleAttackHeavy(PlayerState *player_state, Sound *sound_attack_heavy,
     golemr->idle_buffer = .1;
 
     if (golemr->hp > 0) {
-      PlaySound(*sound_golem_hit);
-    }
-  }
-
-  if (player_state->is_attack_hit &&
-      SimpleCollisionCheck(&hitbox, &boss->hurtbox) &&
-      player_state->attack_heavy_current_frame_no >= 9) {
-
-    boss->hp -= player_state->attack_light_damage *
-                (boss->mode == DEFEND_BOSS ? .5 : .2);
-    player_state->is_attack_hit = 0;
-
-    if (boss->hp > 0) {
       PlaySound(*sound_golem_hit);
     }
   }
@@ -2142,6 +2142,11 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state, Sound *golem_attack,
   }
 
   if (golem->mode == MOB_DYING) {
+    //golem died, spawn fruit
+    Vector2 fruitPosition = {golem->hurtbox.x, golem->hurtbox.y};
+    SpawnFruit(fruitPosition);
+
+    fprintf(stderr, "spawnfruit function called, fruit should respawn in the next frame");
 
     if (golem->direction) {
 
@@ -2154,6 +2159,7 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state, Sound *golem_attack,
 
       if (golem->golem_death.current_frame_no == 2) {
         PlaySound(*golem_dead);
+
       }
 
       if (golem->golem_death.current_frame_no >
@@ -2939,41 +2945,7 @@ void DrawSpear(Spear *spear, Sound *sound_spear, PlayerState *player_state) {
                  WHITE);
 }
 
-void DrawBossHP(Boss *boss) {
-
-  Rectangle back = (Rectangle){.width = 70,
-                               .height = 6,
-                               .x = boss->position.x + 65,
-                               .y = boss->position.y - boss->frame_height - 20};
-
-  Rectangle hp_bar = (Rectangle){
-      .width = back.width * boss->hp, .height = 6, .x = back.x, .y = back.y};
-
-  Color color;
-
-  if (boss->hp > 0.56) {
-    color = (Color){22, 196, 127, 255};
-  }
-
-  else if (boss->hp <= 0.56 && boss->hp >= 20.6) {
-    color = (Color){255, 214, 90, 255};
-  }
-
-  else {
-
-    color = (Color){249, 56, 39, 255};
-  }
-
-  DrawRectangleRounded(back, 1, 0, LIGHTGRAY);
-  DrawRectangleRounded(hp_bar, 1, 0, color);
-}
-
-void DrawBoss(Boss *boss, BossArm *arm, PlayerState *player_state,
-              Sound *sound_melee) {
-
-  DrawBossHP(boss);
-
-  bool melee_end = false;
+void DrawBoss(Boss *boss, BossArm *arm) {
 
   boss->time_passed += GetFrameTime();
 
@@ -2984,78 +2956,36 @@ void DrawBoss(Boss *boss, BossArm *arm, PlayerState *player_state,
   }
 
   if (boss->current_frame_no > boss->sprite_numbers[boss->mode]) {
-
-    if (boss->mode == MELEEATTACK_BOSS) {
-      melee_end = true;
-    }
-
     boss->current_frame_no = 1;
-    boss->in_attack = false;
   }
 
   boss->current_frame_rec.x = (boss->current_frame_no - 1) * boss->frame_width;
   boss->current_frame_rec.y = boss->mode * boss->frame_height;
   boss->current_frame_rec.width = boss->frame_width * boss->facing_direction;
 
-  DrawTexturePro(
-      boss->texture, boss->current_frame_rec,
-      (Rectangle){.x = boss->position.x,
-                  .y = boss->position.y - boss->frame_height * 2 + 50,
-                  .width = boss->frame_width * 2,
-                  .height = boss->frame_height * 2},
-      (Vector2){0, 0}, 0, WHITE);
-
-#ifdef DEBUG
-
-  DrawRectangleLinesEx(
-      (Rectangle){.x = boss->position.x + boss->frame_width / 2.0,
-                  .y = boss->position.y + boss->frame_height / 2.0 -
-                       boss->frame_height * 2 + 50,
-                  .width = boss->frame_width,
-                  .height = boss->frame_height},
-      2.0f, RED);
-
-#endif
-
-  // MELEE RELATED
-
-  if (boss->mode == MELEEATTACK_BOSS) {
-
-    Rectangle rec =
-        (Rectangle){.x = boss->hurtbox.x +
-                         (((boss->facing_direction == -1 ? (-1) : (0)) * 10)),
-                    .y = boss->hurtbox.y,
-                    .width = boss->hurtbox.width + 10,
-                    .height = boss->hurtbox.height};
-
-#ifdef DEBUG
-// DrawRectangleRec(rec, YELLOW);
-#endif
-
-    bool hit = SimpleCollisionCheck(&rec, player_state->player) &&
-               (melee_end) && (boss->no_melee == 0);
-
-    if (hit) {
-      player_state->hp -= 0.3;
-      player_state->camera_shake = true;
-      boss->no_melee = .1;
-      PlaySound(*sound_melee);
-    }
-  }
-
-  // ARM RELATED DOWN
+  DrawTexturePro(boss->texture, boss->current_frame_rec,
+                 (Rectangle){.x = boss->position.x,
+                             .y = boss->position.y - boss->frame_height * 2 + 50,
+                             .width = boss->frame_width * 2 ,
+                             .height = boss->frame_height * 2},
+                 (Vector2){0, 0}, 0,
+                 WHITE)
+  ;
+  DrawRectangleLinesEx((Rectangle){.x = boss->position.x,
+                             .y = boss->position.y - boss->frame_height * 2 + 50,
+                             .width = boss->frame_width * 2 ,
+                             .height = boss->frame_height * 2}, 2.0f, RED);
   if (arm->active) {
 
-    DrawTexturePro(
-        arm->texture,
-        (Rectangle){0.0f, 0.0f,
-                    (float)arm->texture.width * (-1) * (boss->facing_direction),
-                    (float)arm->texture.height},
-        (Rectangle){.x = arm->position.x,
-                    .y = arm->position.y,
-                    .width = arm->frame_width * 0.6f,
-                    .height = arm->frame_height * 0.6f},
-        (Vector2){0, 0}, 0, WHITE);
+
+
+
+    DrawTexturePro(arm->texture, (Rectangle){0.0f,0.0f, (float)arm->texture.width * (-1)*(boss->facing_direction), (float)arm ->texture.height},
+                   (Rectangle){.x = arm->position.x ,
+                               .y = arm->position.y  ,
+                               .width = arm->frame_width  *0.6f,
+                               .height = arm->frame_height *0.6f },
+                   (Vector2){ 0,0}, 0, WHITE);
 
 #ifdef DEBUG
     DrawRectangleLinesEx((Rectangle){.x = arm->position.x,
@@ -3063,62 +2993,61 @@ void DrawBoss(Boss *boss, BossArm *arm, PlayerState *player_state,
                                      .width = arm->frame_width,
                                      .height = arm->frame_height},
                          1.5f, YELLOW);
-
-    DrawRectangleRec(arm->arm_rec, BLUE);
 #endif
+
   }
-  if (boss->mode == LASERATTACK_BOSS) {
-    //
-  }
-}
+  if (boss->mode == LASERATTACK_BOSS){
+   //
+}}
+
 
 void DrawBossLaser(BossLaser *laser, Boss *boss) {
-  if ((laser->active) == 0) {
+  if ((laser->active) == 0){
     return;
   }
-  float laser_beam_length = 750.0f;
+  float laser_beam_length    = 750.0f;
   float laser_beam_thickness = 100.0f;
 
   float dir = (boss->facing_direction == 1) ? 1.0f : -1.0f;
   float frame_h = laser->texture.height / 14.0f;
 
-  Rectangle source =
-      (Rectangle){0, frame_h * 13, (float)laser->texture.width * dir, frame_h};
 
-  Rectangle dest =
-      (Rectangle){.x = (dir > 0) ? laser->position.x
-                                 : laser->position.x - laser_beam_length,
-                  .y = laser->position.y - laser_beam_thickness / 2,
-                  .width = laser_beam_length,
-                  .height = laser_beam_thickness};
+  Rectangle source = (Rectangle){0, frame_h * 13, (float)laser->texture.width * dir, frame_h};
+
+  Rectangle dest = (Rectangle){
+      .x = (dir > 0) ? laser->position.x : laser->position.x - laser_beam_length,
+      .y = laser->position.y - laser_beam_thickness / 2,
+      .width = laser_beam_length ,
+      .height = laser_beam_thickness};
 
   DrawTexturePro(laser->texture, source, dest, (Vector2){0, 0}, 0, WHITE);
 }
 
-void UpdateBossLaser(BossLaser *laser, Boss *boss, PlayerState *player_state,
-                     Sound *sound_laser) {
+
+void UpdateBossLaser(BossLaser *laser, Boss *boss, PlayerState *player_state, Sound *sound_laser) {
 
   int laser_release_frame = boss->sprite_numbers[LASERATTACK_BOSS];
 
   float dir = (boss->facing_direction == 1) ? 1.0f : -1.0f;
 
   if (boss->mode == LASERATTACK_BOSS &&
-      boss->current_frame_no >= laser_release_frame && !laser->active) {
+      boss->current_frame_no >= laser_release_frame &&
+      !laser->active) {
 
     laser->active = true;
     laser->time_passed = 0;
-    laser->hit_player = false;
+    laser ->hit_player = false;
     PlaySound(*sound_laser);
 
+
     laser->position = (Vector2){
-        .x = (dir > 0) ? boss->position.x + boss->frame_width * 2 - 150.0f - 50
-                       : boss->position.x + 150.0f + 50,
-        .y = boss->position.y - boss->frame_height * 2 + 70 +
+        .x = (dir > 0) ? boss->position.x + boss->frame_width * 2 - 150.0f
+                        : boss->position.x + 150.0f,
+        .y = boss->position.y - boss->frame_height * 2 + 50 +
              boss->frame_height * 0.8f + 10};
   }
 
-  if (!laser->active)
-    return;
+  if (!laser->active) return;
 
   laser->time_passed += GetFrameTime();
 
@@ -3127,57 +3056,47 @@ void UpdateBossLaser(BossLaser *laser, Boss *boss, PlayerState *player_state,
     return;
   }
 
-  float laser_beam_length = 700.0f;
-  float laser_beam_thickness = 50.0f;
+  float laser_beam_length    = 750.0f;
+  float laser_beam_thickness = 100.0f;
 
-  Rectangle laser_hitbox =
-      (Rectangle){.x = (dir > 0) ? laser->position.x
-                                 : laser->position.x - laser_beam_length,
-                  .y = laser->position.y - laser_beam_thickness / 2,
-                  .width = laser_beam_length,
-                  .height = laser_beam_thickness};
-
-  DrawRectangleLinesEx(laser_hitbox, 2.0f, RED);
-
-  if (SimpleCollisionCheck(&laser_hitbox, player_state->player) &&
-      boss->no_laser == 0) {
-    if (boss->no_laser == 0) {
-      player_state->hp -= 0.5;
-      player_state->camera_shake = true;
-    }
-
-    boss->no_laser = .5;
-  }
-
+  Rectangle laser_hitbox = (Rectangle){
+      .x = (dir > 0) ? laser->position.x : laser->position.x - laser_beam_length,
+      .y = laser->position.y - laser_beam_thickness / 2,
+      .width = laser_beam_length,
+      .height = laser_beam_thickness};
+    DrawRectangleLinesEx(laser_hitbox, 2.0f, RED);
 #ifdef DEBUG
   DrawRectangleLinesEx(laser_hitbox, 20.0f, PURPLE);
 #endif
-}
 
-void UpdateBossArm(BossArm *arm, Boss *boss, PlayerState *player_state,
-                   Sound *sound_arm) {
-  int arm_release_frame = 9;
-  float arm_speed = 260.0f;
+  }
+
+void UpdateBossArm(BossArm *arm, Boss *boss, PlayerState *player_state) {
+  int  arm_release_frame = 9 ;
+  float arm_speed = 260.0f ;
   float arm_lifetime = 1.2f;
-  float arm_max_distance = 400.0f;
+  float  arm_max_distance = 400.0f ;
 
   if (boss->mode == RANGEDATTACK_BOSS &&
       boss->current_frame_no == arm_release_frame &&
-      arm->last_boss_frame_no != arm_release_frame && !arm->active) {
+      arm->last_boss_frame_no != arm_release_frame &&
+      !arm->active) {
 
     arm->active = true;
 
     arm->time_passed = 0;
 
+
     float dir = (boss->facing_direction == 1) ? 1.0f : -1.0f;
 
-    arm->position = (Vector2){.x = boss->position.x + boss->frame_width * 0.5f +
-                                   dir * (boss->frame_width * 0.3f),
-                              .y = boss->position.y - boss->frame_height * 2 +
-                                   50 + boss->frame_height * 0.4f};
+    arm->position = (Vector2){
+        .x = boss->position.x + boss->frame_width * 0.5f +
+             dir * (boss->frame_width * 0.3f),
+        .y = boss->position.y -boss->frame_height * 2 + 50 +
+             boss->frame_height * 0.4f};
 
     arm->spawn_position = arm->position;
-    arm->velocity = (Vector2){.x = dir * arm_speed, .y = 30};
+    arm->velocity = (Vector2){.x = dir * arm_speed, .y = 0};
   }
 
   arm->last_boss_frame_no = boss->current_frame_no;
@@ -3191,125 +3110,29 @@ void UpdateBossArm(BossArm *arm, Boss *boss, PlayerState *player_state,
 
   arm->time_passed += GetFrameTime();
 
+
   float traveled = diff(arm->position.x, arm->spawn_position.x);
 
-  arm->arm_rec = (Rectangle){.x = arm->position.x,
-                             .y = arm->position.y + 10,
-                             .width = arm->frame_width / 2.0,
-                             .height = arm->frame_height / 3.0};
+  Rectangle arm_rec = (Rectangle){.x = arm->position.x,
+                                  .y = arm->position.y,
+                                  .width = arm->frame_width*2,
+                                  .height = arm->frame_height*2};
 
-  bool hit_player = SimpleCollisionCheck(&arm->arm_rec, player_state->player);
+  bool hit_player = SimpleCollisionCheck(&arm_rec, player_state->player);
 
   if (hit_player || traveled >= arm_max_distance ||
       arm->time_passed >= arm_lifetime) {
     arm->active = false;
     arm->time_passed = 0;
-
-    if (hit_player) {
-      PlaySound(*sound_arm);
-      player_state->hp -= .2;
-      player_state->camera_shake = true;
-    }
   }
 }
-
 void UpdateBoss(Boss *boss, PlayerState *player_state) {
+
+  boss->hurtbox.x = boss->position.x + 50;
+  boss->hurtbox.y = boss->position.y - 200 + 100;
 
   float distance = boss->position.x - player_state->player->x;
   float distance_vertical = boss->position.y - player_state->player->y;
-
-  bool melee_logic = (distance <= -10 && distance >= -150) &&
-                     (distance_vertical <= 100 && distance_vertical >= -10);
-
-  float diff_hor = diff(boss->position.x, player_state->player->x);
-
-  bool player_in_sight = (diff_hor <= 300) &&
-                         (distance_vertical <= 100 && distance_vertical >= -10);
-  // Randomization
-
-  if (!boss->in_attack && !melee_logic && player_in_sight &&
-      boss->time_passed == 0) {
-
-    int random_num = rand() % 4;
-
-    if (random_num == 0) {
-      boss->mode = RANGEDATTACK_BOSS;
-      boss->time_passed = 0.0;
-      boss->current_frame_no = 1;
-      boss->state_timer = 2.5;
-      boss->in_attack = true;
-      boss->attack_count--;
-    }
-
-    else if (random_num == 1) {
-      boss->mode = LASERATTACK_BOSS;
-      boss->time_passed = 0.0;
-      boss->current_frame_no = 1;
-      boss->state_timer = 0.9;
-      boss->in_attack = true;
-      boss->attack_count--;
-    }
-
-    else if (random_num == 2) {
-      boss->mode = IDLE_BOSS;
-    }
-
-    else {
-      boss->mode = DEFEND_BOSS;
-      boss->time_passed = 0.0;
-      boss->current_frame_no = 1;
-      boss->state_timer = 2.5;
-    }
-  }
-
-  // MELEE TIMER
-
-  if (boss->no_melee > 0) {
-    boss->no_melee -= GetFrameTime();
-  }
-
-  else {
-    boss->no_melee = 0;
-  }
-
-  // LASER TIMER
-
-  if (boss->no_laser > 0) {
-    boss->no_laser -= GetFrameTime();
-  }
-
-  else {
-    boss->no_laser = 0;
-  }
-
-  if (SimpleCollisionCheck(&boss->hurtbox, player_state->player)) {
-
-    if (player_state->player->y + player_state->player->height <=
-        boss->hurtbox.y + 15) {
-      player_state->player->y = boss->position.y - boss->hurtbox.height * 1.75;
-      player_state->jump_left = 2;
-      player_state->in_collision_with_boss = 1;
-    }
-
-    else if (boss->facing_direction == 1) {
-      player_state->player->x = boss->position.x + boss->hurtbox.width * 1.5;
-      player_state->in_collision_with_boss = 2;
-    }
-
-    else {
-      player_state->player->x =
-          boss->position.x - player_state->player->width + 50;
-      player_state->in_collision_with_boss = 2;
-    }
-
-  }
-
-  else {
-    player_state->in_collision_with_boss = 0;
-  }
-
-  boss->hurtbox.x = boss->position.x + 50;
-  boss->hurtbox.y = boss->position.y - 200 + 100 + 10;
 
   if (distance < -70) {
     boss->facing_direction = 1;
@@ -3333,25 +3156,27 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
     }
   }
 
-  else if (boss->mode == LASERATTACK_BOSS) {
-    if (boss->state_timer >= 0) {
+   else if (boss -> mode == LASERATTACK_BOSS){
+     if (boss->state_timer >= 0){
       boss->mode = LASERATTACK_BOSS;
       boss->state_timer -= GetFrameTime();
-      if (boss->current_frame_no >= boss->sprite_numbers[LASERATTACK_BOSS]) {
+      if (boss->current_frame_no >= boss->sprite_numbers[LASERATTACK_BOSS]){
         boss->current_frame_no = boss->sprite_numbers[LASERATTACK_BOSS];
         boss->time_passed = 0.0;
       }
-    } else {
+    }
+    else{
       boss->state_timer = 0;
       boss->mode = IDLE_BOSS;
     }
   }
 
-  else if (boss->mode == RANGEDATTACK_BOSS) {
-    if (boss->state_timer >= 0) {
+  else if (boss->mode == RANGEDATTACK_BOSS ){
+     if (boss->state_timer >= 0){
       boss->mode = RANGEDATTACK_BOSS;
       boss->state_timer -= GetFrameTime();
       if (boss->current_frame_no >= 9) {
+
         boss->time_passed = 0.0;
       }
     } else {
@@ -3361,38 +3186,49 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
 
   }
 
-  else if (boss->no_melee == 0 && melee_logic) {
+  else if (IsKeyPressed(KEY_J)) {
+    boss->mode = DEFEND_BOSS;
+    boss->time_passed = 0.0;
+    boss->current_frame_no = 1;
+    boss->state_timer = 2.5;
+
+  }
+
+  else if (IsKeyPressed(KEY_K)) {
+    boss->mode = RANGEDATTACK_BOSS;
+    boss->time_passed = 0.0;
+    boss->current_frame_no = 1;
+    boss->state_timer = 2.5;
+
+  }
+
+  else if (IsKeyPressed(KEY_L)){
+    boss -> mode = LASERATTACK_BOSS;
+    boss -> time_passed = 0.0;
+    boss ->current_frame_no = 1;
+    boss ->state_timer = 0.9;
+
+  }
+  else if ((distance <= -10 && distance >= -200) && (distance_vertical <= 200 && distance_vertical >= -200)){
     boss->mode = MELEEATTACK_BOSS;
   }
 
-  else if ((distance_vertical <= 100 && distance_vertical >= -100)) {
-
-    float add;
-
-    if (distance < -120) {
-      add = boss->speed * .1;
-      boss->position.x += add;
+  else if ((distance_vertical <= 200 && distance_vertical >= -200)) {
+    if (distance < -200) {
+      boss->position.x += 5 * GetFrameTime();
       boss->mode = IDLE_BOSS;
     }
-
     if (distance > -10) {
-      add = -boss->speed * .1;
-      boss->position.x += add;
+      boss->position.x -= 5 * GetFrameTime();
       boss->mode = IDLE_BOSS;
-    }
-
-    else {
+    } else {
       boss->mode = IDLE_BOSS;
-    }
-
-    if (boss->position.x <
-        (boss->lower_bound * 32 - (boss->frame_width / 2.0))) {
-      boss->position.x -= add;
     }
   }
 
-  // printf("Boss Mode: %d | Frame: %d | Pos X: %f\n", boss->mode,
-  // boss->current_frame_no, boss->position.x);
+  else {
+    boss->mode = IDLE_BOSS;
+  }
 
 #ifdef DEBUG
   // printf("Boss Mode: %d | Frame: %d | Pos X: %f\n", boss->mode,
@@ -3401,7 +3237,7 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
 #endif
 }
 
-void HandleFlag(Flag *flag, PlayerState *player_state, Sound *next_level) {
+void HandleFlag(Flag *flag, PlayerState *player_state, Sound* next_level) {
 
   flag->time_passed += GetFrameTime();
 
@@ -3427,7 +3263,6 @@ void HandleFlag(Flag *flag, PlayerState *player_state, Sound *next_level) {
 
   if (SimpleCollisionCheck(player_state->player, &flag->hurtbox)) {
     player_state->quest_1_complete = 2;
-    player_state->level = 2;
 
     player_state->player->x = 0;
     player_state->player->y = 1160;
@@ -3436,17 +3271,17 @@ void HandleFlag(Flag *flag, PlayerState *player_state, Sound *next_level) {
   }
 }
 
+
 int main() {
-
-  srand(time(NULL));
-
-  int is_transitioning = 0;
-  float transition_timer = 0;
-  int should_exit = 1;
   Scoreboard board = {0};
   char buffer[15] = {0};
   int length_of_name = 0;
   float speedrun_time = 0;
+
+  
+
+
+
 
   Menus menu = MAIN_MENU;
 
@@ -3456,6 +3291,7 @@ int main() {
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   InitWindow(window.width, window.height, "GGG");
   ScoreRead(&board);
+
 
   Texture2D bg1 = LoadTexture("resources/bg/bg1.png");
   Texture2D bg2 = LoadTexture("resources/bg/bg2.png");
@@ -3512,8 +3348,7 @@ int main() {
                                         .width = 56 * tileset.tile_width,
                                         .height = 71 * tileset.tile_height};
 
-  Rectangle player =
-      (Rectangle){.x = 0, .y = 66 * 32, .width = 32, .height = 64};
+  Rectangle player = (Rectangle){.x = 0, .y = 66 * 32, .width = 32, .height = 64};
   PlayerState player_state = (PlayerState){
       .player = &player,
       .speed = 5.7,
@@ -3558,31 +3393,24 @@ int main() {
       .camera_shake = false,
       .camera_shake_time = 0,
       .no_attack = 0,
-      .quest_1_complete = 0,
-      .in_collision_with_boss = false,
-      .level = 1
+      .quest_1_complete = 0
 
   };
 
-#ifdef DEBUG
-
-  player_state.player->x = 37 * 32;
-  player_state.player->y = 0;
-
-#endif
+  #ifdef DEBUG
+    player_state.player->x = 20*32;
+    player_state.player->y = 100*32;
+  #endif
 
   Boss boss =
-      (Boss){.position = (Vector2){.x = 36 * 32,
-                                   .y = 23 * 32}, // changed to 1160 for testing
+      (Boss){.position = (Vector2){.x = 36 * 32, .y = 1300}, //changed to 1160 for testing
              .mode = IDLE_BOSS,
-             .speed = 8,
-             .hp = 1,
+             .speed = 5.8,
              .hitbox =
                  (Rectangle){
                      .x = 0,
                      .y = 0,
                  },
-             .hurtbox = (Rectangle){.x = 0, .y = 0, .width = 100, .height = 90},
              .frame_width = 100,
              .frame_height = 100,
              .sprite_numbers = {4, 8, 9, 8, 7, 7, 10, 10, 4},
@@ -3590,36 +3418,24 @@ int main() {
              .current_frame_no = 1,
              .current_frame_rec =
                  (Rectangle){.x = 0, .y = 0, .width = 100, .height = 100},
-             .time_needed = {0.2, 0.1, 0.1, 0.1, 0.05, 0.1, 0.1, 0.1, 0.1},
+             .time_needed = {0.2, 0.1, 0.1, 0.1, 0.15, 0.1, 0.1, 0.1, 0.1},
              .state_timer = 0.0f,
              .time_passed = 0.1,
-             .facing_direction = 1,
-             .lower_bound = 36,
-             .no_melee = 0,
-             .no_laser = 0,
-             .attack_count = 3,
-             .in_attack = false
+             .facing_direction = 1};
+    BossArm boss_arm = (BossArm){
+      .texture = LoadTexture("resources/mob/boss/arm_projectile.png"),
+      .active = false,
 
-      };
+      .time_passed = 0,
 
-  BossArm boss_arm =
-      (BossArm){.texture = LoadTexture("resources/mob/boss/arm_projectile.png"),
-                .active = false,
-
-                .time_passed = 0,
-
-                .frame_width = boss.frame_width,
-                .frame_height = boss.frame_height,
-                .frame_count = boss.sprite_numbers[RANGEDATTACK_BOSS],
-                .last_boss_frame_no = 0,
-                .arm_rec = (Rectangle){.x = 0, .y = 0, .width = 0, .height = 0}
-
-      };
-
-  BossLaser boss_laser =
-      (BossLaser){.texture = LoadTexture("resources/mob/boss/Laser_sheet.png"),
-                  .active = false,
-                  .lifetime = 0.3f};
+      .frame_width = boss.frame_width,
+      .frame_height = boss.frame_height,
+      .frame_count = boss.sprite_numbers[RANGEDATTACK_BOSS],
+      .last_boss_frame_no = 0};
+  BossLaser boss_laser = (BossLaser){
+      .texture = LoadTexture("resources/mob/boss/Laser_sheet.png"),
+      .active = false,
+      .lifetime = 0.3f};
 
   Camera2D camera = (Camera2D){
       .offset =
@@ -3684,7 +3500,6 @@ int main() {
   InitAnimationStates(animation_states);
 
   InitAudioDevice();
-  Sound sound_hover = LoadSound("resources/audio/hover.mp3");
   Sound sound_lasercharge = LoadSound("resources/audio/laser_charge.mp3");
   Sound sound_laser = LoadSound("resources/audio/sound_laser.mp3");
   Sound sound_walking = LoadSound("resources/audio/running_in_grass.mp3");
@@ -3703,8 +3518,7 @@ int main() {
   Sound sound_nature = LoadSound("resources/audio/nature.mp3");
   Sound sound_spear = LoadSound("resources/audio/spear.mp3");
   Sound sound_next_level = LoadSound("resources/audio/next_level.mp3");
-  Sound sound_arm = LoadSound("resources/audio/sound_arm.mp3");
-  Sound sound_melee = LoadSound("resources/audio/sound_melee.mp3");
+
 
   SetTargetFPS(window.fps);
 
@@ -4028,46 +3842,51 @@ int main() {
       .current_frame_no = 1,
       .current_frame_rec =
           (Rectangle){.x = 0, .y = 0, .width = 28, .height = 28},
-  };
-
-  Spear spear = {
-
-      .sprite = LoadTexture("resources/traps/spear.png"),
-      .frame_count = 12,
-      .current_frame_no = 1,
-      .current_frame_rec =
+        };
+        
+        Spear spear = {
+          
+          .sprite = LoadTexture("resources/traps/spear.png"),
+          .frame_count = 12,
+          .current_frame_no = 1,
+          .current_frame_rec =
           (Rectangle){.x = 0, .y = 0, .width = 16, .height = 64},
-      .time_needed = 0.1,
-      .time_passed = 0,
-      .position = (Vector2){.x = 10 * 32, .y = 66 * 32},
-      .hitbox =
+          .time_needed = 0.1,
+          .time_passed = 0,
+          .position = (Vector2){.x = 10 * 32, .y = 66 * 32},
+          .hitbox =
           (Rectangle){.x = 10 * 32 + 4, .y = 66 * 32, .width = 72, .height = 16}
-
-  };
-
-  Flag flag = (Flag){
-
-      .texture = LoadTexture("resources/other/flags/flag.png"),
-      .position = (Vector2){.x = 52 * 32, .y = 68 * 32},
-      .hurtbox =
+          
+        };
+        
+        Flag flag = (Flag){
+          
+          .texture = LoadTexture("resources/other/flags/flag.png"),
+          .position = (Vector2){.x = 52 * 32, .y = 68 * 32},
+          .hurtbox =
           (Rectangle){
-              .x = 52 * 32, .y = 68 * 32 - 24, .width = 16, .height = 24},
-      .frame_height = 24,
-      .frame_width = 16,
-      .frame_count = 10,
-      .current_frame_no = 1,
-      .time_passed = 0,
-      .time_needed = 0.1,
-      .current_frame_rec =
-          (Rectangle){.x = 0, .y = 0, .width = 16, .height = 24},
+            .x = 52 * 32, .y = 68 * 32 - 24, .width = 16, .height = 24},
+            .frame_height = 24,
+            .frame_width = 16,
+            .frame_count = 10,
+            .current_frame_no = 1,
+            .time_passed = 0,
+            .time_needed = 0.1,
+            .current_frame_rec =
+            (Rectangle){.x = 0, .y = 0, .width = 16, .height = 24},
+            
+          };
+          
+          //load fruit texture
+          Texture2D fruitTexture = LoadTexture(FRUIT_PATH);
+          
+          
+          float frame_time = 0;
+          
+  while (!WindowShouldClose()) {
 
-  };
 
-  float frame_time = 0;
 
-  int sound_played = 1;
-
-  while (!WindowShouldClose() && should_exit) {
 
     if (player_state.quest_1_complete > 0) {
       player_state.quest_1_complete -= GetFrameTime();
@@ -4077,7 +3896,61 @@ int main() {
         player_state.quest_1_complete = 0;
         menu = GAME_MENU;
       }
+
     }
+
+    if (menu == MAIN_MENU) {
+      speedrun_time = 0;
+      StopSound(sound_nature);
+      //  Draw phase
+      BeginDrawing();
+      // Clean, dark minimalist background
+      // ClearBackground(GetColor(0x0f111aFF));
+      ClearBackground((Color){15, 17, 26, 128});
+
+      // 1. DRAW THE TITLE ("HOLLOW")
+      const char titleText[] = "HOLLOW";
+      float titleFontSize = 80.0;
+      float titleSpacing = 2.0;
+
+      // Calculate horizontal centering for the title
+      Vector2 titleDim = MeasureTextEx(font_press_start, titleText,
+                                       titleFontSize, titleSpacing);
+      float titleX = (GetScreenWidth() - titleDim.x) / 2.0;
+      float titleY =
+          GetScreenHeight() / 2.0 - titleDim.y; // Positioned in the upper half
+
+      // Draw the main title text
+      // DrawText(titleText, titleX, titleY, titleFontSize, SKYBLUE);
+      DrawTextEx(font_press_start, titleText,
+                 (Vector2){.x = titleX, .y = titleY}, titleFontSize, 2,
+                 SKYBLUE);
+
+      // 2. DRAW THE SUBTITLE ("Press Enter to Play Game")
+      const char *subText = "Press Enter to Play";
+      float subFontSize = 40.0;
+      float subSpacing = 2.0;
+
+      // Calculate horizontal centering for the subtitle
+
+      Vector2 subDim =
+          MeasureTextEx(font_jetbrains_mono, subText, subFontSize, subSpacing);
+
+      float subX = (GetScreenWidth() - subDim.x) / 2.0;
+      float subY = titleY + 100; // Positioned in the lower half
+
+      // Draw the subtitle text
+      // DrawText(subText, subX, subY, subFontSize, LIGHTGRAY);
+      DrawTextEx(font_jetbrains_mono, subText, (Vector2){.x = subX, .y = subY},
+                 subFontSize, subSpacing, LIGHTGRAY);
+
+      EndDrawing();
+      if (IsKeyPressed(KEY_ENTER)) {
+        menu = GAME_MENU;
+                            ;
+      }
+    }
+
 
     if (menu == QUEST_1_MENU) {
 
@@ -4093,16 +3966,19 @@ int main() {
       Vector2 titleDim = MeasureTextEx(font_press_start, titleText,
                                        titleFontSize, titleSpacing);
       Vector2 titleDim2 = MeasureTextEx(font_press_start, titleText2,
-                                        titleFontSize, titleSpacing);
+                                       titleFontSize, titleSpacing);
 
       float titleX = (GetScreenWidth() - titleDim.x) / 2.0;
-      float titleY = GetScreenHeight() / 2.0 - titleDim.y;
+      float titleY =
+                     GetScreenHeight() / 2.0 - titleDim.y;
 
       float titleX2 = (GetScreenWidth() - titleDim2.x) / 2.0;
-      float titleY2 = GetScreenHeight() / 2.0 - titleDim2.y + titleFontSize;
+      float titleY2 =
+                     GetScreenHeight() / 2.0 - titleDim2.y + titleFontSize;
 
       DrawTextEx(font_press_start, titleText,
-                 (Vector2){.x = titleX, .y = titleY}, titleFontSize, 2, GREEN);
+                 (Vector2){.x = titleX, .y = titleY}, titleFontSize, 2,
+                 GREEN);
 
       DrawTextEx(font_press_start, titleText2,
                  (Vector2){.x = titleX2, .y = titleY2}, titleFontSize, 2,
@@ -4110,191 +3986,68 @@ int main() {
 
       EndDrawing();
     }
-    if (is_transitioning) {
-      transition_timer += GetFrameTime();
-      printf("%d", transition_timer);
-      printf("%d", is_transitioning);
 
-      if (transition_timer < 0.5) {
+    if (menu == OPTIONS_MENU){
+      Rectangle btn = { 1100, 80, 400, 120 };
+      Rectangle btn_help = {1100, 300 , 400 , 120};
+        bool hover = CheckCollisionPointRec(GetMousePosition(), btn);
+        bool hover_help = CheckCollisionPointRec(GetMousePosition(),btn_help);
 
-        float laserY = (GetScreenHeight() / 2.0f) - 200.0f;
-        float laserHeight = 200.0f;
-        Rectangle source =
-            (Rectangle){0, (boss_laser.texture.height * 13 / (float)14),
-                        (float)boss_laser.texture.width * (-1),
-                        boss_laser.texture.height / 14.0f};
-        Rectangle dest = (Rectangle){
-            0, laserY, ((float)GetScreenWidth() + 400) * (transition_timer) * 2,
-            laserHeight};
-        DrawTexturePro(boss_laser.texture, source, dest, (Vector2){0, 0}, 0,
-                       WHITE);
+        if (hover) {
+            btn = (Rectangle){ btn_help.x - 4, btn_help.y - 2, btn_help.width + 8, btn_help.height + 4 };
+        }
+         if (hover_help) {
+            btn = (Rectangle){ btn_help.x - 4, btn_help.y - 2, btn_help.width + 8, btn_help.height + 4 };
+        }
 
-      } else {
-        is_transitioning = 0;
-        transition_timer = 0;
+            DrawRectangleRec(btn, hover ? (Color){40, 50, 75, 230} : (Color){25, 30, 45, 200});
+            DrawRectangleLinesEx(btn, hover ? 3.0f : 2.0f, (Color){0, 180, 216, 255});
+            DrawRectangleRec(btn_help, hover_help ? (Color){40, 50, 75, 230} : (Color){25, 30, 45, 200});
+            DrawRectangleLinesEx(btn_help, hover_help ? 3.0f : 2.0f, (Color){0, 180, 216, 255});
+
+            // 2. Measure and draw using your loaded font
+            float fontSize = hover ? 48.0f : 44.0f;
+            float spacing = 2.0f; // Space between letters
+
+            Vector2 textSize = MeasureTextEx(font_press_start, "HELP", fontSize, spacing);
+
+
+            // DrawTextEx allows you to pass your custom font structure
+            DrawTextEx(font_press_start, "PLAY",
+                       (Vector2){ btn.x + (btn.width - textSize.x) / 2, btn.y + (btn.height - textSize.y) / 2 },
+                       fontSize, spacing, WHITE);
+
+
+        EndDrawing();
+      if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
         menu = GAME_MENU;
       }
     }
 
-    if (menu == MAIN_MENU) {
-      speedrun_time = 0;
-      StopSound(sound_nature);
-      BeginDrawing();
-      ClearBackground((Color){15, 17, 26, 128});
+    if (menu == HELP_MENU){
 
-      const char titleText[] = "HOLLOW";
-      float titleFontSize = 80.0;
-      float titleSpacing = 2.0;
-
-      Vector2 titleDim = MeasureTextEx(font_press_start, titleText,
-                                       titleFontSize, titleSpacing);
-      float titleX = (GetScreenWidth() - titleDim.x) / 2.0;
-      float titleY = GetScreenHeight() / 2.0 - titleDim.y;
-
-      DrawTextEx(font_press_start, titleText,
-                 (Vector2){.x = titleX, .y = titleY}, titleFontSize, 2,
-                 SKYBLUE);
-
-      const char *subText = "Press Enter to Play";
-      float subFontSize = 40.0;
-      float subSpacing = 2.0;
-
-      Vector2 subDim =
-          MeasureTextEx(font_jetbrains_mono, subText, subFontSize, subSpacing);
-
-      float subX = (GetScreenWidth() - subDim.x) / 2.0;
-      float subY = titleY + 100;
-
-      DrawTextEx(font_jetbrains_mono, subText, (Vector2){.x = subX, .y = subY},
-                 subFontSize, subSpacing, LIGHTGRAY);
-
-      EndDrawing();
-      if (IsKeyPressed(KEY_ENTER)) {
-        menu = OPTIONS_MENU;
-      }
-    } else if (menu == OPTIONS_MENU) {
-
-      Vector2 mouse = GetMousePosition();
-
-      float btnWidth = 400;
-      float btnHeight = 60;
-      float btnGap = 30;
-      float btnX = (GetScreenWidth() - btnWidth) / 2.0f;
-      float startY = GetScreenHeight() / 2.0f - 30;
-
-      Rectangle btnPlay = {btnX, startY, btnWidth, btnHeight};
-      Rectangle btnLeaderboard = {btnX, startY + (btnHeight + btnGap), btnWidth,
-                                  btnHeight};
-      Rectangle btnHelp = {btnX, startY + 2 * (btnHeight + btnGap), btnWidth,
-                           btnHeight};
-      Rectangle btnExit = {btnX, startY + 3 * (btnHeight + btnGap), btnWidth,
-                           btnHeight};
-
-      bool hoverPlay = CheckCollisionPointRec(mouse, btnPlay);
-      bool hoverLeaderboard = CheckCollisionPointRec(mouse, btnLeaderboard);
-      bool hoverHelp = CheckCollisionPointRec(mouse, btnHelp);
-      bool hoverExit = CheckCollisionPointRec(mouse, btnExit);
-
-      if (hoverPlay || hoverLeaderboard || hoverHelp || hoverExit) {
-        if (!IsSoundPlaying(sound_hover) && sound_played) {
-          PlaySound(sound_hover);
-          sound_played = 0;
-        }
-      } else {
-        sound_played = 1;
-      }
-
-      if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        if (hoverPlay) {
-          is_transitioning = 1;
-          PlaySound(sound_laser);
-        }
-        if (hoverLeaderboard) {
-          menu = SCOREBOARD_MENU;
-        }
-        if (hoverHelp) {
-          menu = HELP_MENU;
-        }
-        if (hoverExit) {
-          should_exit = 0;
-        }
-      }
-      // if (IsKeyPressed(KEY_ENTER)){
-      // menu = GAME_MENU;
-      //}
-
-      BeginDrawing();
-      ClearBackground((Color){15, 17, 26, 128});
-      Vector2 TitleDim = MeasureTextEx(font_press_start, "HOLLOW", 100, 2);
-      DrawTextEx(font_press_start, "HOLLOW",
-                 (Vector2){.x = (GetScreenWidth() - TitleDim.x) / 2,
-                           .y = TitleDim.y - 15},
-                 100.0, 2, SKYBLUE);
-
-      DrawRectangleRec(btnPlay, hoverPlay ? (Color){60, 65, 90, 255}
-                                          : (Color){35, 35, 50, 255});
-      DrawRectangleLinesEx(btnPlay, 2, hoverPlay ? YELLOW : SKYBLUE);
-      Vector2 playDim = MeasureTextEx(font_jetbrains_mono, "Play Game", 26, 1);
-      DrawTextEx(font_jetbrains_mono, "Play Game",
-                 (Vector2){btnPlay.x + (btnPlay.width - playDim.x) / 2.0f,
-                           btnPlay.y + (btnPlay.height - playDim.y) / 2.0f},
-                 26, 1, hoverPlay ? YELLOW : WHITE);
-
-      DrawRectangleRec(btnLeaderboard, hoverLeaderboard
-                                           ? (Color){60, 65, 90, 255}
-                                           : (Color){35, 35, 50, 255});
-      DrawRectangleLinesEx(btnLeaderboard, 2,
-                           hoverLeaderboard ? YELLOW : SKYBLUE);
-      Vector2 lbDim = MeasureTextEx(font_jetbrains_mono, "Leaderboard", 26, 1);
-      DrawTextEx(
-          font_jetbrains_mono, "Leaderboard",
-          (Vector2){btnLeaderboard.x + (btnLeaderboard.width - lbDim.x) / 2.0f,
-                    btnLeaderboard.y +
-                        (btnLeaderboard.height - lbDim.y) / 2.0f},
-          26, 1, hoverLeaderboard ? YELLOW : WHITE);
-
-      DrawRectangleRec(btnHelp, hoverHelp ? (Color){60, 65, 90, 255}
-                                          : (Color){35, 35, 50, 255});
-      DrawRectangleLinesEx(btnHelp, 2, hoverHelp ? YELLOW : SKYBLUE);
-      Vector2 helpDim = MeasureTextEx(font_jetbrains_mono, "Help", 26, 1);
-      DrawTextEx(font_jetbrains_mono, "Help",
-                 (Vector2){btnHelp.x + (btnHelp.width - helpDim.x) / 2.0f,
-                           btnHelp.y + (btnHelp.height - helpDim.y) / 2.0f},
-                 26, 1, hoverHelp ? YELLOW : WHITE);
-
-      DrawRectangleRec(btnExit, hoverExit ? (Color){60, 65, 90, 255}
-                                          : (Color){35, 35, 50, 255});
-      DrawRectangleLinesEx(btnExit, 2, hoverExit ? YELLOW : SKYBLUE);
-      Vector2 exitDim = MeasureTextEx(font_jetbrains_mono, "Exit", 26, 1);
-      DrawTextEx(font_jetbrains_mono, "Exit",
-                 (Vector2){btnExit.x + (btnExit.width - exitDim.x) / 2.0f,
-                           btnExit.y + (btnExit.height - exitDim.y) / 2.0f},
-                 26, 1, hoverExit ? YELLOW : WHITE);
-
-      EndDrawing();
     }
 
-    if (menu == SCOREBOARD_MENU) {
-      BeginDrawing();
-      ClearBackground((Color){20, 20, 30, 255});
-      // printf("board.count = %d\n", board.count);
-      int screenW = GetScreenWidth();
+    if (menu == SCOREBOARD_MENU){
 
-      const char *title = "SCOREBOARD";
-      Vector2 titleDim = MeasureTextEx(font_press_start, title, 44, 2);
-      DrawTextEx(font_press_start, title,
-                 (Vector2){(screenW - titleDim.x) / 2, 60}, 44, 2, SKYBLUE);
+    BeginDrawing();
+    ClearBackground((Color){20, 20, 30, 255});
+    printf("board.count = %d\n", board.count);
+    int screenW = GetScreenWidth();
 
-      float rowHeight = 42;
-      float startY = 160;
-      float boxWidth = 420;
-      float boxX = (screenW - boxWidth) / 2.0f;
+    const char *title = "SCOREBOARD";
+    Vector2 titleDim = MeasureTextEx(font_press_start, title, 44, 2);
+    DrawTextEx(font_press_start, title, (Vector2){(screenW - titleDim.x) / 2, 60}, 44, 2, SKYBLUE);
 
-      for (int i = 0; i < board.count; i++) {
-        Rectangle row = {boxX, startY + i * rowHeight, boxWidth, rowHeight - 6};
+    float rowHeight = 42;
+    float startY = 160;
+    float boxWidth = 420;
+    float boxX = (screenW - boxWidth) / 2.0f;
 
-        Color rowColor =
-            (i == 0) ? (Color){45, 45, 30, 255} : (Color){35, 35, 50, 255};
+    for (int i = 0; i < board.count; i++){
+        Rectangle row = { boxX, startY + i * rowHeight, boxWidth, rowHeight - 6 };
+
+        Color rowColor = (i == 0) ? (Color){45, 45, 30, 255} : (Color){35, 35, 50, 255};
         Color textColor = (i == 0) ? YELLOW : WHITE;
 
         DrawRectangleRec(row, rowColor);
@@ -4302,122 +4055,76 @@ int main() {
 
         char timeStr[16];
         int total = (int)board.people[i].time;
-        snprintf(timeStr, sizeof(timeStr), "%d:%02d:%02d", total / 3600,
-                 (total % 3600) / 60, total % 60);
+        snprintf(timeStr, sizeof(timeStr), "%d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60);
 
-        DrawTextEx(font_jetbrains_mono, TextFormat("%d.", i + 1),
-                   (Vector2){row.x + 12, row.y + 8}, 22, 1, LIGHTGRAY);
-        DrawTextEx(font_jetbrains_mono, board.people[i].name,
-                   (Vector2){row.x + 50, row.y + 8}, 22, 1, textColor);
-        DrawTextEx(font_jetbrains_mono, timeStr,
-                   (Vector2){row.x + boxWidth - 110, row.y + 8}, 22, 1,
-                   textColor);
-      }
-
-      const char *hint = "Press ENTER to return";
-      Vector2 hintDim = MeasureTextEx(font_jetbrains_mono, hint, 18, 1);
-      DrawTextEx(font_jetbrains_mono, hint,
-                 (Vector2){(screenW - hintDim.x) / 2,
-                           startY + board.count * rowHeight + 30},
-                 18, 1, (Color){110, 115, 130, 255});
-
-      EndDrawing();
-
-      if (IsKeyPressed(KEY_ENTER)) {
-        menu = OPTIONS_MENU;
-      }
+        DrawTextEx(font_jetbrains_mono, TextFormat("%d.", i + 1), (Vector2){row.x + 12, row.y + 8}, 22, 1, LIGHTGRAY);
+        DrawTextEx(font_jetbrains_mono, board.people[i].name, (Vector2){row.x + 50, row.y + 8}, 22, 1, textColor);
+        DrawTextEx(font_jetbrains_mono, timeStr, (Vector2){row.x + boxWidth - 110, row.y + 8}, 22, 1, textColor);
     }
 
-    if (menu == INPUT_MENU) {
-      BeginDrawing();
-      ClearBackground((Color){20, 20, 30, 255});
+    const char *hint = "Press ENTER to return";
+    Vector2 hintDim = MeasureTextEx(font_jetbrains_mono, hint, 18, 1);
+    DrawTextEx(font_jetbrains_mono, hint, (Vector2){(screenW - hintDim.x) / 2, startY + board.count * rowHeight + 30}, 18, 1, (Color){110, 115, 130, 255});
 
-      int ch = GetCharPressed();
-      while (ch > 0) {
-        if (ch >= 32 && ch <= 125 && ch != ' ' && length_of_name < 14) {
-          buffer[length_of_name++] = (char)ch;
-          buffer[length_of_name] = '\0';
+    EndDrawing();
+
+    if (IsKeyPressed(KEY_ENTER)){
+        menu = MAIN_MENU;
+    }
+}
+    if (menu == INPUT_MENU){
+    BeginDrawing();
+    ClearBackground((Color){20, 20, 30, 255});
+
+    int ch = GetCharPressed();
+    while (ch > 0){
+        if (ch >= 32 && ch <= 125 && ch != ' ' && length_of_name < 14){
+            buffer[length_of_name++] = (char)ch;
+            buffer[length_of_name] = '\0';
         }
         ch = GetCharPressed();
-      }
+    }
 
-      if (IsKeyPressed(KEY_BACKSPACE) && length_of_name > 0) {
+    if (IsKeyPressed(KEY_BACKSPACE) && length_of_name > 0){
         buffer[--length_of_name] = '\0';
-      }
+    }
 
-      int screenW = GetScreenWidth();
+    int screenW = GetScreenWidth();
 
-      const char *timeText = TextFormat("Your time: %.2fs", speedrun_time);
-      Vector2 timeDim = MeasureTextEx(font_press_start, timeText, 30, 2);
-      DrawTextEx(font_press_start, timeText,
-                 (Vector2){(screenW - timeDim.x) / 2, 120}, 30, 2, YELLOW);
+    const char *timeText = TextFormat("Your time: %.2fs", speedrun_time);
+    Vector2 timeDim = MeasureTextEx(font_press_start, timeText, 30, 2);
+    DrawTextEx(font_press_start, timeText, (Vector2){(screenW - timeDim.x) / 2, 120}, 30, 2, YELLOW);
 
-      const char *prompt = "Enter your name:";
-      Vector2 promptDim = MeasureTextEx(font_jetbrains_mono, prompt, 24, 1);
-      DrawTextEx(font_jetbrains_mono, prompt,
-                 (Vector2){(screenW - promptDim.x) / 2, 190}, 24, 1, LIGHTGRAY);
+    const char *prompt = "Enter your name:";
+    Vector2 promptDim = MeasureTextEx(font_jetbrains_mono, prompt, 24, 1);
+    DrawTextEx(font_jetbrains_mono, prompt, (Vector2){(screenW - promptDim.x) / 2, 190}, 24, 1, LIGHTGRAY);
 
-      Rectangle box = {(screenW - 320) / 2.0f, 230, 320, 50};
-      DrawRectangleRec(box, (Color){35, 35, 50, 255});
-      DrawRectangleLinesEx(box, 2, SKYBLUE);
-      DrawTextEx(font_jetbrains_mono, buffer, (Vector2){box.x + 12, box.y + 12},
-                 26, 1, WHITE);
+    Rectangle box = { (screenW - 320) / 2.0f, 230, 320, 50 };
+    DrawRectangleRec(box, (Color){35, 35, 50, 255});
+    DrawRectangleLinesEx(box, 2, SKYBLUE);
+    DrawTextEx(font_jetbrains_mono, buffer, (Vector2){box.x + 12, box.y + 12}, 26, 1, WHITE);
 
-      EndDrawing();
+    EndDrawing();
 
-      if (IsKeyPressed(KEY_ENTER) && length_of_name > 0) {
+    if (IsKeyPressed(KEY_ENTER) && length_of_name > 0){
         ScoreAdd(&board, speedrun_time, buffer);
         ScoreWrite(&board);
         menu = MAIN_MENU;
-      }
     }
-
-    if (menu == HELP_MENU) {
-
-      BeginDrawing();
-      Vector2 ControlDim = MeasureTextEx(font_press_start, "CONTROLS", 70, 2);
-      DrawTextEx(font_press_start, "CONTROLS",
-                 (Vector2){(GetScreenWidth() - ControlDim.x) / 2, 60}, 70, 2,
-                 SKYBLUE);
-      DrawTextEx(font_jetbrains_mono, "A,S,D", (Vector2){1200, 200}, 45, 2,
-                 YELLOW);
-      DrawTextEx(font_jetbrains_mono, "Movement Keys", (Vector2){200, 200}, 45,
-                 2, YELLOW);
-      DrawTextEx(font_jetbrains_mono, "SPACE", (Vector2){1200, 250}, 45, 2,
-                 YELLOW);
-      DrawTextEx(font_jetbrains_mono, "Jump", (Vector2){200, 250}, 45, 2,
-                 YELLOW);
-      DrawTextEx(font_jetbrains_mono, "J", (Vector2){1200, 300}, 45, 2, YELLOW);
-      DrawTextEx(font_jetbrains_mono, "Light Attack", (Vector2){200, 300}, 45,
-                 2, YELLOW);
-      DrawTextEx(font_jetbrains_mono, "K", (Vector2){1200, 350}, 45, 2, YELLOW);
-      DrawTextEx(font_jetbrains_mono, "Heavy Attack", (Vector2){200, 350}, 45,
-                 2, YELLOW);
-      DrawTextEx(GetFontDefault(), "Press enter to go back",
-                 (Vector2){1000, 800}, 45, 2, Fade(WHITE, 0.3f));
-      DrawTextEx(font_press_start, "Hint : Uhh.. try not to die??",
-                 (Vector2){200, 600}, 40, 2, (Color){0, 229, 255, 255});
-
-      ClearBackground((Color){15, 17, 26, 128});
-      EndDrawing();
-      if (IsKeyPressed(KEY_ENTER)) {
-
-        menu = OPTIONS_MENU;
-      }
-    }
-
+}
     if (menu == GAME_MENU) {
 
       if (!IsSoundPlaying(sound_nature)) {
         PlaySound(sound_nature);
       }
       speedrun_time += GetFrameTime();
-      if (IsKeyPressed(KEY_Y)) {
+      if (IsKeyPressed(KEY_Y)){
         menu = SCOREBOARD_MENU;
       }
-      if (IsKeyPressed(KEY_X)) {
+      if (IsKeyPressed(KEY_X)){
         menu = INPUT_MENU;
       }
+
 
       Update(&player_state, &camera, &tilemap, &current_mode);
       UpdateFloaters(floaters, &player_state);
@@ -4430,7 +4137,7 @@ int main() {
       UpdateSpear(&spear, &player_state);
       UpdateBossLaser(&boss_laser, &boss, &player_state, &sound_laser);
       UpdateBoss(&boss, &player_state);
-      UpdateBossArm(&boss_arm, &boss, &player_state, &sound_arm);
+      UpdateBossArm(&boss_arm, &boss, &player_state);
 
       BeginDrawing();
 
@@ -4449,7 +4156,9 @@ int main() {
       ClearBackground(RAYWHITE);
 
 #ifdef DEBUG
+
       DrawRectangleRec(trap_underworld.hitbox, BLUE);
+
 #endif
 
       DrawTrapUnderworld(&trap_underworld);
@@ -4480,25 +4189,22 @@ int main() {
 #endif
 
       if ((!player_state.in_attack_heavy) &&
-          (player_state.in_attack_light ||
-           (IsKeyPressed(KEY_J) && !player_state.in_collision_with_boss)) &&
+          (player_state.in_attack_light || IsKeyPressed(KEY_J)) &&
           (player_state.no_attack <= 0)) {
         current_mode = ATTACK_LIGHT;
         player_state.in_attack_light = true;
         HandleAttackLight(&player_state, &sound_attack_light, &golem,
-                          &sound_golem_hit, &golemr, &boss);
+                          &sound_golem_hit, &golemr);
 
       }
 
       else if ((!player_state.in_attack_light) &&
-               (player_state.in_attack_heavy ||
-                (IsKeyPressed(KEY_K) &&
-                 !player_state.in_collision_with_boss)) &&
+               (player_state.in_attack_heavy || IsKeyPressed(KEY_K)) &&
                (player_state.no_attack <= 0)) {
         current_mode = ATTACK_HEAVY;
         player_state.in_attack_heavy = true;
         HandleAttackHeavy(&player_state, &sound_attack_heavy, &golem,
-                          &sound_golem_hit, &golemr, &boss);
+                          &sound_golem_hit, &golemr);
       }
 
       else if (IsKeyPressed(KEY_SPACE) && !player_state.is_being_hit &&
@@ -4538,6 +4244,7 @@ int main() {
         } else {
           StopSound(sound_walking);
         }
+
         // Sound of Walking Code end//
 
         switch (current_mode) {
@@ -4604,11 +4311,44 @@ int main() {
         }
       }
 
+      //Draw fruit
+
+      for (int i = 0; i < MAX_FRUITS; i++) {
+          if (fruitPool[i].active) {
+              // Collision logic
+
+              fprintf(stderr, "activated fruit found\n");
+
+              // // Change the width and height to 14.0f (slightly bigger than a 10px dot)
+              // Rectangle fruit_rec = { fruitPool[i].position.x, fruitPool[i].position.y, 14.0f, 14.0f };
+              // Rectangle dest = { fruitPool[i].position.x, fruitPool[i].position.y, 14.0f, 14.0f };
+              Rectangle fruit_rec = {fruitPool[i].position.x, fruitPool[i].position.y, fruitTexture.width, fruitTexture.height}; 
+              if (CheckCollisionRecs(*player_state.player, fruit_rec)) {
+                  fruitPool[i].active = false;
+                  player_state.hp = fminf(player_state.hp+delta_hp_fruit, 1.0f);
+                  //continue; // Skip drawing if just collected
+              }
+
+              // Drawing logic
+
+              fprintf(stderr, "fruit drawn\n");
+              Rectangle frame = {
+                .x = 0,
+                .y = 0,
+                .width = 16,
+                .height = 16
+              };
+              DrawTextureRec(fruitTexture, frame, fruitPool[i].position, WHITE);
+              //DrawTexture(fruitTexture, fruitPool[i].position.x, fruitPool[i].position.y, WHITE);
+          }
+      }
+
 #ifdef DEBUG
       DrawRectangleRec(boss.hurtbox, BLUE);
 #endif
 
-      DrawBoss(&boss, &boss_arm, &player_state, &sound_melee);
+
+      DrawBoss(&boss,&boss_arm);
       DrawBossLaser(&boss_laser, &boss);
       EndMode2D();
 
@@ -4654,17 +4394,12 @@ int main() {
 
       if (IsKeyPressed(KEY_ENTER)) {
         menu = MAIN_MENU;
-
-        if (player_state.level == 2) {
-          player_state.player->y = 1000;
-        }
-
-        else {
-          player_state.player->y = 65 * 32;
-        }
+        player_state.player->y =
+            1000; // not resetting y causes insta death because player is still
+                  // below falling level; see below comment;
 
 #ifdef DEBUG
-        player_state.player->x = 40 * 32;
+        player_state.player->x = 100;
         player_state.player->y = 0;
 #endif
 
@@ -4685,17 +4420,12 @@ int main() {
         golem.mode = MOB_WALK;
         golemr.hp = 1;
         golemr.mode = MOB_WALK;
-        boss.state_timer = 0;
-        boss.current_frame_no = 0;
-        boss.mode = IDLE_BOSS;
-        boss.hp = 1;
         ResetPlayerAirState(&player_state);
       }
     }
   }
 
   StopSound(sound_nature);
-  UnloadSound(sound_hover);
   UnloadSound(sound_laser);
   UnloadSound(sound_walking);
   UnloadSound(death_scream);
@@ -4711,10 +4441,9 @@ int main() {
   UnloadSound(sound_bullet_hit);
   UnloadSound(sound_spear);
   UnloadSound(sound_next_level);
-  UnloadSound(sound_arm);
-  UnloadSound(sound_melee);
 
   CloseAudioDevice();
+
 
   UnloadTexture(tileset_texture);
   UnloadTexture(bg1);
@@ -4755,5 +4484,10 @@ int main() {
   UnloadTexture(boss.texture);
   UnloadTexture(boss_arm.texture);
   UnloadTexture(boss_laser.texture);
+
+  //unload fruit
+  UnloadTexture(fruitTexture);
+
+
   CloseWindow();
 }
