@@ -1161,7 +1161,7 @@ void Update(PlayerState *player_state, Camera2D *camera, TilemapState *tilemap,
   //   player_state->gravity *= 1.5;
   // }
 
-  //KEY_S has some bug with it and it's unnecessary imo
+  // KEY_S has some bug with it and it's unnecessary imo
 
 #ifdef DEBUG
 
@@ -3005,7 +3005,7 @@ void DrawBoss(Boss *boss, BossArm *arm, PlayerState *player_state,
                   .height = boss->frame_height * 2},
       (Vector2){0, 0}, 0, WHITE);
 
-  #ifdef DEBUG
+#ifdef DEBUG
 
   DrawRectangleLinesEx(
       (Rectangle){.x = boss->position.x + boss->frame_width / 2.0,
@@ -3215,8 +3215,6 @@ void UpdateBossArm(BossArm *arm, Boss *boss, PlayerState *player_state,
 
 void UpdateBoss(Boss *boss, PlayerState *player_state) {
 
-
-
   float distance = boss->position.x - player_state->player->x;
   float distance_vertical = boss->position.y - player_state->player->y;
 
@@ -3225,10 +3223,12 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
 
   float diff_hor = diff(boss->position.x, player_state->player->x);
 
-  bool player_in_sight = (diff_hor <= 300) && (distance_vertical <= 100 && distance_vertical >= -10);
+  bool player_in_sight = (diff_hor <= 300) &&
+                         (distance_vertical <= 100 && distance_vertical >= -10);
   // Randomization
 
-   if (!boss->in_attack && !melee_logic && player_in_sight && boss->time_passed== 0) {
+  if (!boss->in_attack && !melee_logic && player_in_sight &&
+      boss->time_passed == 0) {
 
     int random_num = rand() % 4;
 
@@ -3241,7 +3241,7 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
       boss->attack_count--;
     }
 
-    else if(random_num == 1) {
+    else if (random_num == 1) {
       boss->mode = LASERATTACK_BOSS;
       boss->time_passed = 0.0;
       boss->current_frame_no = 1;
@@ -3250,18 +3250,17 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
       boss->attack_count--;
     }
 
-    else if(random_num == 2){
-        boss->mode = IDLE_BOSS;
+    else if (random_num == 2) {
+      boss->mode = IDLE_BOSS;
     }
 
-    else{
-        boss->mode = DEFEND_BOSS;
-        boss->time_passed = 0.0;
-        boss->current_frame_no = 1;
-        boss->state_timer = 2.5;
+    else {
+      boss->mode = DEFEND_BOSS;
+      boss->time_passed = 0.0;
+      boss->current_frame_no = 1;
+      boss->state_timer = 2.5;
     }
   }
-
 
   // MELEE TIMER
 
@@ -3392,7 +3391,6 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
     }
   }
 
-
   // printf("Boss Mode: %d | Frame: %d | Pos X: %f\n", boss->mode,
   // boss->current_frame_no, boss->position.x);
 
@@ -3442,6 +3440,8 @@ int main() {
 
   srand(time(NULL));
 
+  int is_transitioning = 0;
+  float transition_timer = 0;
   int should_exit = 1;
   Scoreboard board = {0};
   char buffer[15] = {0};
@@ -4110,49 +4110,61 @@ int main() {
 
       EndDrawing();
     }
+    if (is_transitioning) {
+      transition_timer += GetFrameTime();
+      printf("%d", transition_timer);
+      printf("%d", is_transitioning);
+
+      if (transition_timer < 0.5) {
+
+        float laserY = (GetScreenHeight() / 2.0f) - 200.0f;
+        float laserHeight = 200.0f;
+        Rectangle source =
+            (Rectangle){0, (boss_laser.texture.height * 13 / (float)14),
+                        (float)boss_laser.texture.width * (-1),
+                        boss_laser.texture.height / 14.0f};
+        Rectangle dest = (Rectangle){
+            0, laserY, ((float)GetScreenWidth() + 400) * (transition_timer) * 2,
+            laserHeight};
+        DrawTexturePro(boss_laser.texture, source, dest, (Vector2){0, 0}, 0,
+                       WHITE);
+
+      } else {
+        is_transitioning = 0;
+        transition_timer = 0;
+        menu = GAME_MENU;
+      }
+    }
 
     if (menu == MAIN_MENU) {
       speedrun_time = 0;
       StopSound(sound_nature);
-      //  Draw phase
       BeginDrawing();
-      // Clean, dark minimalist background
-      // ClearBackground(GetColor(0x0f111aFF));
       ClearBackground((Color){15, 17, 26, 128});
 
-      // 1. DRAW THE TITLE ("HOLLOW")
       const char titleText[] = "HOLLOW";
       float titleFontSize = 80.0;
       float titleSpacing = 2.0;
 
-      // Calculate horizontal centering for the title
       Vector2 titleDim = MeasureTextEx(font_press_start, titleText,
                                        titleFontSize, titleSpacing);
       float titleX = (GetScreenWidth() - titleDim.x) / 2.0;
-      float titleY =
-          GetScreenHeight() / 2.0 - titleDim.y; // Positioned in the upper half
+      float titleY = GetScreenHeight() / 2.0 - titleDim.y;
 
-      // Draw the main title text
-      // DrawText(titleText, titleX, titleY, titleFontSize, SKYBLUE);
       DrawTextEx(font_press_start, titleText,
                  (Vector2){.x = titleX, .y = titleY}, titleFontSize, 2,
                  SKYBLUE);
 
-      // 2. DRAW THE SUBTITLE ("Press Enter to Play Game")
       const char *subText = "Press Enter to Play";
       float subFontSize = 40.0;
       float subSpacing = 2.0;
-
-      // Calculate horizontal centering for the subtitle
 
       Vector2 subDim =
           MeasureTextEx(font_jetbrains_mono, subText, subFontSize, subSpacing);
 
       float subX = (GetScreenWidth() - subDim.x) / 2.0;
-      float subY = titleY + 100; // Positioned in the lower half
+      float subY = titleY + 100;
 
-      // Draw the subtitle text
-      // DrawText(subText, subX, subY, subFontSize, LIGHTGRAY);
       DrawTextEx(font_jetbrains_mono, subText, (Vector2){.x = subX, .y = subY},
                  subFontSize, subSpacing, LIGHTGRAY);
 
@@ -4160,8 +4172,7 @@ int main() {
       if (IsKeyPressed(KEY_ENTER)) {
         menu = OPTIONS_MENU;
       }
-    }
-    if (menu == OPTIONS_MENU) {
+    } else if (menu == OPTIONS_MENU) {
 
       Vector2 mouse = GetMousePosition();
 
@@ -4195,7 +4206,8 @@ int main() {
 
       if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (hoverPlay) {
-          menu = GAME_MENU;
+          is_transitioning = 1;
+          PlaySound(sound_laser);
         }
         if (hoverLeaderboard) {
           menu = SCOREBOARD_MENU;
@@ -4207,6 +4219,9 @@ int main() {
           should_exit = 0;
         }
       }
+      // if (IsKeyPressed(KEY_ENTER)){
+      // menu = GAME_MENU;
+      //}
 
       BeginDrawing();
       ClearBackground((Color){15, 17, 26, 128});
@@ -4259,8 +4274,6 @@ int main() {
       EndDrawing();
     }
 
-    if (menu == HELP_MENU) {
-    }
     if (menu == SCOREBOARD_MENU) {
       BeginDrawing();
       ClearBackground((Color){20, 20, 30, 255});
@@ -4314,6 +4327,7 @@ int main() {
         menu = OPTIONS_MENU;
       }
     }
+
     if (menu == INPUT_MENU) {
       BeginDrawing();
       ClearBackground((Color){20, 20, 30, 255});
@@ -4357,6 +4371,41 @@ int main() {
         menu = MAIN_MENU;
       }
     }
+
+    if (menu == HELP_MENU) {
+
+      BeginDrawing();
+      Vector2 ControlDim = MeasureTextEx(font_press_start, "CONTROLS", 70, 2);
+      DrawTextEx(font_press_start, "CONTROLS",
+                 (Vector2){(GetScreenWidth() - ControlDim.x) / 2, 60}, 70, 2,
+                 SKYBLUE);
+      DrawTextEx(font_jetbrains_mono, "A,S,D", (Vector2){1200, 200}, 45, 2,
+                 YELLOW);
+      DrawTextEx(font_jetbrains_mono, "Movement Keys", (Vector2){200, 200}, 45,
+                 2, YELLOW);
+      DrawTextEx(font_jetbrains_mono, "SPACE", (Vector2){1200, 250}, 45, 2,
+                 YELLOW);
+      DrawTextEx(font_jetbrains_mono, "Jump", (Vector2){200, 250}, 45, 2,
+                 YELLOW);
+      DrawTextEx(font_jetbrains_mono, "J", (Vector2){1200, 300}, 45, 2, YELLOW);
+      DrawTextEx(font_jetbrains_mono, "Light Attack", (Vector2){200, 300}, 45,
+                 2, YELLOW);
+      DrawTextEx(font_jetbrains_mono, "K", (Vector2){1200, 350}, 45, 2, YELLOW);
+      DrawTextEx(font_jetbrains_mono, "Heavy Attack", (Vector2){200, 350}, 45,
+                 2, YELLOW);
+      DrawTextEx(GetFontDefault(), "Press enter to go back",
+                 (Vector2){1000, 800}, 45, 2, Fade(WHITE, 0.3f));
+      DrawTextEx(font_press_start, "Hint : Uhh.. try not to die??",
+                 (Vector2){200, 600}, 40, 2, (Color){0, 229, 255, 255});
+
+      ClearBackground((Color){15, 17, 26, 128});
+      EndDrawing();
+      if (IsKeyPressed(KEY_ENTER)) {
+
+        menu = OPTIONS_MENU;
+      }
+    }
+
     if (menu == GAME_MENU) {
 
       if (!IsSoundPlaying(sound_nature)) {
@@ -4606,18 +4655,13 @@ int main() {
       if (IsKeyPressed(KEY_ENTER)) {
         menu = MAIN_MENU;
 
-
-        if(player_state.level == 2){
-            player_state.player->y =
-                1000;
+        if (player_state.level == 2) {
+          player_state.player->y = 1000;
         }
 
-        else{
-            player_state.player->y =
-                65 * 32;
+        else {
+          player_state.player->y = 65 * 32;
         }
-
-
 
 #ifdef DEBUG
         player_state.player->x = 40 * 32;
