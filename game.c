@@ -3492,6 +3492,22 @@ void HandleFlag(Flag *flag, PlayerState *player_state, Sound *next_level) {
   }
 }
 
+void HandleAttackStatus(PlayerState *player_state) {
+
+  if (player_state->no_attack > 0) {
+
+    Rectangle timer_bar = (Rectangle){
+        .width = 110 * player_state->no_attack,
+        .height = 3,
+        .x = player_state->player->x + player_state->player->width / 2.0 - 27.5,
+        .y = player_state->player->y - 25};
+
+    Color color = (Color){249, 56, 39, 255};
+
+    DrawRectangleRounded(timer_bar, 1, 0, color);
+  }
+}
+
 int main() {
 
   float bosshp = 0.05;
@@ -4238,6 +4254,9 @@ int main() {
       if (IsKeyPressed(KEY_ENTER)) {
         menu = OPTIONS_MENU;
       }
+
+
+
     } else if (menu == OPTIONS_MENU) {
 
       Vector2 mouse = GetMousePosition();
@@ -4770,6 +4789,9 @@ int main() {
 
       DrawBoss(&boss, &boss_arm, &player_state, &sound_melee);
       DrawBossLaser(&boss_laser, &boss);
+      HandleAttackStatus(&player_state);
+
+
       EndMode2D();
 
       EndDrawing();
@@ -4778,7 +4800,7 @@ int main() {
         player_state.hp = 0;
         StopSound(sound_walking);
       }
-      // printf("%f \n", player_state.player->y);
+
     }
 
     if (player_state.hp <= 0) {
@@ -4901,6 +4923,7 @@ int main() {
       }
     }
   }
+
 
   StopSound(sound_nature);
   UnloadSound(sound_win);
