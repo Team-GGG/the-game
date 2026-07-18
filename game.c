@@ -519,7 +519,7 @@ void ScoreAdd(Scoreboard *board, float time, char name[]) {
   else {
     limit = 9;
   }
-  
+
   for (int i = limit; i > index; i--) {
 
     board->people[i] = board->people[i - 1];
@@ -3518,7 +3518,7 @@ void HandleAttackStatus(PlayerState *player_state) {
 
 int main() {
 
-  float bosshp = 0.05;
+  float bosshp = 1;
 
   srand(time(NULL));
 
@@ -4896,7 +4896,7 @@ int main() {
         boss.state_timer = 0;
         boss.current_frame_no = 0;
         boss.mode = IDLE_BOSS;
-        boss.hp = boss.hp;
+        boss.hp = bosshp;
         quest1_complete = 0;
         player_state.quest_1_complete = 0;
         ResetPlayerAirState(&player_state);
@@ -4927,7 +4927,7 @@ int main() {
         boss.state_timer = 0;
         boss.current_frame_no = 0;
         boss.mode = IDLE_BOSS;
-        boss.hp = boss.hp;
+        boss.hp = bosshp;
         ResetPlayerAirState(&player_state);
       }
     }
