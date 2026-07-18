@@ -13,6 +13,20 @@
 #include <stdio.h>
 #endif
 
+#define FRUIT_PATH "resources/fruits/fruits.png"
+#define DELTA_HP_FRUIT 0.3f
+
+#define MAX_FRUITS 10
+
+typedef struct {
+  Vector2 position;
+  Texture2D texture;
+  bool active;
+  float collision_timer;
+} Fruit;
+
+Fruit fruitPool[MAX_FRUITS] = {0}; // Sets all active states to false initially
+
 int quest1_complete = 0;
 typedef struct {
 
@@ -447,6 +461,30 @@ typedef struct {
   Rectangle hitbox;
 
 } Spear;
+
+void SpawnFruit(Vector2 position) {
+  for (int i = 0; i < MAX_FRUITS; i++) {
+    if (!fruitPool[i].active) {
+      fruitPool[i].position = position;
+      fruitPool[i].active = true;
+      break; // Spawned one, stop looking
+    }
+  }
+}
+
+bool shouldCollect(Fruit *f) {
+  if (f->collision_timer >= 0.5f) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+void collectFruit(Fruit *f, PlayerState *player_state) {
+  f->active = false;
+  player_state->hp = fminf(player_state->hp + DELTA_HP_FRUIT, 1.0f);
+  f->collision_timer = 0;
+}
 
 void ScoreWrite(Scoreboard *board) {
   FILE *f = fopen("Score.bin", "wb");
@@ -2144,6 +2182,10 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state, Sound *golem_attack,
 
   if (golem->mode == MOB_DYING) {
 
+    // golem died, spawn fruit
+    Vector2 fruitPosition = {golem->hurtbox.x, golem->hurtbox.y};
+    SpawnFruit(fruitPosition);
+
     if (golem->direction) {
 
       golem->golem_death.time_passed += GetFrameTime();
@@ -2162,6 +2204,9 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state, Sound *golem_attack,
         golem->golem_death.current_frame_no = 1;
         golem->mode = MOB_DEAD;
         StopSound(*golem_dead);
+
+        // dying to dead, spawn fruit
+        SpawnFruit((Vector2){.x = golem->hurtbox.x, .y = golem->hurtbox.y});
         return;
       }
 
@@ -2194,6 +2239,10 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state, Sound *golem_attack,
         golem->golem_death_back.current_frame_no = 1;
         golem->mode = MOB_DEAD;
         StopSound(*golem_dead);
+
+        // dying to dead, spawn fruit
+        SpawnFruit((Vector2){.x = golem->hurtbox.x, .y = golem->hurtbox.y});
+
         return;
       }
 
@@ -2778,6 +2827,9 @@ void DrawGolemR(MobGolemR *golemr, PlayerState *player_state,
         golemr->golemr_death.current_frame_no = 1;
         golemr->mode = MOB_DEAD;
         StopSound(*golemr_dead);
+
+        // golemr just died, spawn fruit
+        SpawnFruit((Vector2){.x = golemr->hurtbox.x, .y = golemr->hurtbox.y});
         return;
       }
 
@@ -2810,6 +2862,9 @@ void DrawGolemR(MobGolemR *golemr, PlayerState *player_state,
         golemr->golemr_death_back.current_frame_no = 1;
         golemr->mode = MOB_DEAD;
         StopSound(*golemr_dead);
+
+        // golemr just died, spawn fruit
+        SpawnFruit((Vector2){.x = golemr->hurtbox.x, .y = golemr->hurtbox.y});
         return;
       }
 
@@ -3709,6 +3764,8 @@ int main() {
   Sound sound_next_level = LoadSound("resources/audio/next_level.mp3");
   Sound sound_arm = LoadSound("resources/audio/sound_arm.mp3");
   Sound sound_melee = LoadSound("resources/audio/sound_melee.mp3");
+  Sound sound_fruit_collected =
+      LoadSound("resources/audio/fruit_collected.mp3");
 
   SetTargetFPS(window.fps);
 
@@ -4071,9 +4128,13 @@ int main() {
 
   int sound_played = 1;
 
+  // load fruit texture
+  Texture2D fruitTexture = LoadTexture(FRUIT_PATH);
+
   while (!WindowShouldClose() && should_exit) {
 
-  // printf("speedrun: %f + quest_status: %d\n", speedrun_time, quest1_complete);
+    // printf("speedrun: %f + quest_status: %d\n", speedrun_time,
+    // quest1_complete);
 
     if (player_state.quest_1_complete > 0) {
       player_state.quest_1_complete -= GetFrameTime();
@@ -4481,6 +4542,58 @@ int main() {
       DrawRectangleRec(player, RED);
 #endif
 
+      // Draw fruit
+
+      // Draw fruit
+
+      for (int i = 0; i < MAX_FRUITS; i++) {
+        if (fruitPool[i].active) {
+          // Collision logic
+          // // Change the width and height to 14.0f (slightly bigger than a
+          // 10px dot)
+          Rectangle fruit_rec = {fruitPool[i].position.x,
+                                 fruitPool[i].position.y, 14.0f, 14.0f};
+
+          if (CheckCollisionRecs(*player_state.player, fruit_rec)) {
+            fruitPool[i].active = false;
+
+            player_state.hp = fminf(player_state.hp + DELTA_HP_FRUIT, 1.0f);
+            // continue; // Skip drawing if just collected
+
+            fruitPool[i].collision_timer += GetFrameTime();
+
+            if (shouldCollect(&fruitPool[i])) {
+              collectFruit(&fruitPool[i], &player_state);
+              PlaySound(sound_fruit_collected);
+            }
+
+          }
+
+          else {
+            fruitPool[i].collision_timer = 0; // Reset timer if not colliding
+          }
+
+          // Drawing logic
+
+          Rectangle frame = {.x = 0, .y = 0, .width = 16, .height = 16};
+
+          // #ifdef DEBUG
+          //   DrawRectangleRec(fruit_rec, RED);
+          // #endif
+
+          // #ifndef DEBUG
+          //   DrawTextureRec(fruitTexture, frame, fruitPool[i].position,
+          //   WHITE);
+          // #endif
+
+          DrawTextureRec(fruitTexture, frame, fruitPool[i].position, WHITE);
+          // DrawRectangleRec(fruit_rec, WHITE);
+
+          // DrawTexture(fruitTexture, fruitPool[i].position.x,
+          // fruitPool[i].position.y, WHITE);
+        }
+      }
+
       if ((!player_state.in_attack_heavy) &&
           (player_state.in_attack_light ||
            (IsKeyPressed(KEY_J) && !player_state.in_collision_with_boss)) &&
@@ -4709,36 +4822,34 @@ int main() {
         ResetPlayerAirState(&player_state);
       }
 
-      if(IsKeyPressed(KEY_R)){
+      if (IsKeyPressed(KEY_R)) {
 
-          menu = GAME_MENU;
-          player_state.player->y = 1000;
+        menu = GAME_MENU;
+        player_state.player->y = 1000;
 
-          player_state.player->x =
-              0; // Need to reset all other (x,speed etc) too , but I think it
-          // will be better to write a deathfunction and handle this using
-          // that instead of everything else
+        player_state.player->x =
+            0; // Need to reset all other (x,speed etc) too , but I think it
+        // will be better to write a deathfunction and handle this using
+        // that instead of everything else
 
-          player_state.death_sound = false;
-          player_state.camera_shake = false;
-          player_state.camera_shake_time = 0;
-          player_state.last_direction = 1;
-          player_state.in_jump = 0;
-          player_state.in_attack_light = 0;
-          player_state.in_attack_heavy = 0;
-          player_state.hp = 1;
-          golem.hp = 1;
-          golem.mode = MOB_WALK;
-          golemr.hp = 1;
-          golemr.mode = MOB_WALK;
-          boss.state_timer = 0;
-          boss.current_frame_no = 0;
-          boss.mode = IDLE_BOSS;
-          boss.hp = 1;
-          ResetPlayerAirState(&player_state);
+        player_state.death_sound = false;
+        player_state.camera_shake = false;
+        player_state.camera_shake_time = 0;
+        player_state.last_direction = 1;
+        player_state.in_jump = 0;
+        player_state.in_attack_light = 0;
+        player_state.in_attack_heavy = 0;
+        player_state.hp = 1;
+        golem.hp = 1;
+        golem.mode = MOB_WALK;
+        golemr.hp = 1;
+        golemr.mode = MOB_WALK;
+        boss.state_timer = 0;
+        boss.current_frame_no = 0;
+        boss.mode = IDLE_BOSS;
+        boss.hp = 1;
+        ResetPlayerAirState(&player_state);
       }
-
-
     }
   }
 
@@ -4803,5 +4914,7 @@ int main() {
   UnloadTexture(boss.texture);
   UnloadTexture(boss_arm.texture);
   UnloadTexture(boss_laser.texture);
+  UnloadTexture(fruitTexture);
+
   CloseWindow();
 }
