@@ -3494,6 +3494,8 @@ void HandleFlag(Flag *flag, PlayerState *player_state, Sound *next_level) {
 
 int main() {
 
+  float bosshp = 0.05;
+
   srand(time(NULL));
 
   int is_transitioning = 0;
@@ -3632,7 +3634,7 @@ int main() {
                                    .y = 23 * 32}, // changed to 1160 for testing
              .mode = IDLE_BOSS,
              .speed = 8,
-             .hp = 1,
+             .hp = bosshp,
              .hitbox =
                  (Rectangle){
                      .x = 0,
@@ -4439,6 +4441,40 @@ int main() {
       if (IsKeyPressed(KEY_ENTER) && length_of_name > 0) {
         ScoreAdd(&board, speedrun_time, buffer);
         ScoreWrite(&board);
+
+        // RESETING EVERYTHING
+        menu = MAIN_MENU;
+        player_state.player->y = 65 * 32;
+
+        player_state.player->x =
+            0; // Need to reset all other (x,speed etc) too , but I think it
+        // will be better to write a deathfunction and handle this using
+        // that instead of everything else
+
+        for (int i = 0; i < MAX_FRUITS; i++) {
+          fruitPool[i].active = 0;
+        }
+
+        player_state.death_sound = false;
+        player_state.camera_shake = false;
+        player_state.camera_shake_time = 0;
+        player_state.last_direction = 1;
+        player_state.in_jump = 0;
+        player_state.in_attack_light = 0;
+        player_state.in_attack_heavy = 0;
+        player_state.hp = 1;
+        golem.hp = 1;
+        golem.mode = MOB_WALK;
+        golemr.hp = 1;
+        golemr.mode = MOB_WALK;
+        boss.state_timer = 0;
+        boss.current_frame_no = 0;
+        boss.mode = IDLE_BOSS;
+        boss.hp = bosshp;
+        quest1_complete = 0;
+        player_state.quest_1_complete = 0;
+        ResetPlayerAirState(&player_state);
+
         menu = MAIN_MENU;
       }
     }
@@ -4829,7 +4865,7 @@ int main() {
         boss.state_timer = 0;
         boss.current_frame_no = 0;
         boss.mode = IDLE_BOSS;
-        boss.hp = 1;
+        boss.hp = boss.hp;
         quest1_complete = 0;
         player_state.quest_1_complete = 0;
         ResetPlayerAirState(&player_state);
@@ -4860,7 +4896,7 @@ int main() {
         boss.state_timer = 0;
         boss.current_frame_no = 0;
         boss.mode = IDLE_BOSS;
-        boss.hp = 1;
+        boss.hp = boss.hp;
         ResetPlayerAirState(&player_state);
       }
     }
