@@ -3987,7 +3987,7 @@ int main() {
 
       .damage = 0.45,
       .walk_speed = 1,
-      .bullet_speed = 12,
+      .bullet_speed = 3,
       .idle_buffer = 0,
       .no_damage_time = 0,
 
