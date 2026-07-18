@@ -3594,7 +3594,7 @@ int main() {
              .current_frame_no = 1,
              .current_frame_rec =
                  (Rectangle){.x = 0, .y = 0, .width = 100, .height = 100},
-             .time_needed = {0.2, 0.13, 0.1, 0.1, 0.05, 0.1, 0.1, 0.1, 0.1},
+             .time_needed = {0.2, 0.133, 0.1, 0.1, 0.05, 0.1, 0.1, 0.1, 0.1},
              .state_timer = 0.0f,
              .time_passed = 0.1,
              .facing_direction = 1,
@@ -3688,6 +3688,7 @@ int main() {
   InitAnimationStates(animation_states);
 
   InitAudioDevice();
+  Sound sound_win = LoadSound("resources/audio/win.mp3");
   Sound sound_hover = LoadSound("resources/audio/hover.mp3");
   Sound sound_lasercharge = LoadSound("resources/audio/laser_charge.mp3");
   Sound sound_laser = LoadSound("resources/audio/sound_laser.mp3");
@@ -4142,6 +4143,7 @@ int main() {
 
     if (menu == MAIN_MENU) {
       speedrun_time = 0;
+      StopSound(sound_walking);
       StopSound(sound_nature);
       BeginDrawing();
       ClearBackground((Color){15, 17, 26, 128});
@@ -4306,6 +4308,8 @@ int main() {
 
         char timeStr[16];
         int total = (int)board.people[i].time;
+        snprintf(timeStr, sizeof(timeStr), "%d:%02d:%02d", total / 3600,
+                 (total % 3600) / 60, total % 60);
 
         DrawTextEx(font_jetbrains_mono, TextFormat("%d.", i + 1),
                    (Vector2){row.x + 12, row.y + 8}, 22, 1, LIGHTGRAY);
@@ -4333,7 +4337,6 @@ int main() {
     if (menu == INPUT_MENU) {
       BeginDrawing();
       ClearBackground((Color){20, 20, 30, 255});
-
       int ch = GetCharPressed();
       while (ch > 0) {
         if (ch >= 32 && ch <= 125 && ch != ' ' && length_of_name < 14) {
@@ -4348,18 +4351,21 @@ int main() {
       }
 
       int screenW = GetScreenWidth();
-
+      Vector2 CongratsDim = MeasureTextEx(font_press_start,"CONGRATULATIONS!",60,2);
+      DrawTextEx(font_press_start,"CONGRATULATIONS!",(Vector2){(screenW-CongratsDim.x)/2+20,100},60,2,SKYBLUE);
+      Vector2 WonDim = MeasureTextEx(font_press_start,"YOU HAVE WON!",45,2);
+      DrawTextEx(font_press_start,"YOU HAVE WON!",(Vector2){(screenW-CongratsDim.x)/2+100,320},60,2,Fade(WHITE,1));
       const char *timeText = TextFormat("Your time: %.2fs", speedrun_time);
       Vector2 timeDim = MeasureTextEx(font_press_start, timeText, 30, 2);
       DrawTextEx(font_press_start, timeText,
-                 (Vector2){(screenW - timeDim.x) / 2, 120}, 30, 2, YELLOW);
+                 (Vector2){(screenW - timeDim.x) / 2, 620}, 30, 2, YELLOW);
 
       const char *prompt = "Enter your name:";
       Vector2 promptDim = MeasureTextEx(font_jetbrains_mono, prompt, 24, 1);
       DrawTextEx(font_jetbrains_mono, prompt,
-                 (Vector2){(screenW - promptDim.x) / 2, 190}, 24, 1, LIGHTGRAY);
+                 (Vector2){(screenW - promptDim.x) / 2, 690}, 24, 1, LIGHTGRAY);
 
-      Rectangle box = {(screenW - 320) / 2.0f, 230, 320, 50};
+      Rectangle box = {(screenW - 320) / 2.0f, 730, 320, 50};
       DrawRectangleRec(box, (Color){35, 35, 50, 255});
       DrawRectangleLinesEx(box, 2, SKYBLUE);
       DrawTextEx(font_jetbrains_mono, buffer, (Vector2){box.x + 12, box.y + 12},
@@ -4414,10 +4420,11 @@ int main() {
         PlaySound(sound_nature);
       }
       speedrun_time += GetFrameTime();
-      if (IsKeyPressed(KEY_Y)) {
-        menu = SCOREBOARD_MENU;
-      }
-      if (IsKeyPressed(KEY_X)) {
+      //if (IsKeyPressed(KEY_Y)) {
+        //menu = SCOREBOARD_MENU;
+      //}
+      if (boss.hp<=0) {
+        PlaySound(sound_win);
         menu = INPUT_MENU;
       }
 
@@ -4703,7 +4710,7 @@ int main() {
         boss.state_timer = 0;
         boss.current_frame_no = 0;
         boss.mode = IDLE_BOSS;
-        boss.hp = 1;
+        boss.hp = 0.05f;
         quest1_complete = 0;
         player_state.quest_1_complete = 0;
         ResetPlayerAirState(&player_state);
@@ -4734,7 +4741,7 @@ int main() {
           boss.state_timer = 0;
           boss.current_frame_no = 0;
           boss.mode = IDLE_BOSS;
-          boss.hp = 1;
+          boss.hp = 0.05f;
           ResetPlayerAirState(&player_state);
       }
 
@@ -4743,6 +4750,7 @@ int main() {
   }
 
   StopSound(sound_nature);
+  UnloadSound(sound_win);
   UnloadSound(sound_hover);
   UnloadSound(sound_laser);
   UnloadSound(sound_walking);
