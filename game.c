@@ -3030,7 +3030,7 @@ void DrawBossHP(Boss *boss) {
     color = (Color){22, 196, 127, 255};
   }
 
-  else if (boss->hp <= 0.56 && boss->hp >= 20.6) {
+  else if (boss->hp <= 0.56 && boss->hp >= 0.2) {
     color = (Color){255, 214, 90, 255};
   }
 
