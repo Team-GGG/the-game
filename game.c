@@ -11,7 +11,7 @@
 #endif
 
 #define FRUIT_PATH "resources/fruits/fruits.png"
-#define delta_hp_fruit 0.1f
+#define delta_hp_fruit 0.3f
 
 #define MAX_FRUITS 10
 
@@ -19,16 +19,19 @@ typedef struct {
   Vector2 position;
   Texture2D texture;
   bool active;
+
+  float collision_timer;
+
 } Fruit;
+
+
 
 Fruit fruitPool[MAX_FRUITS] = { 0 }; // Sets all active states to false initially
 
 void SpawnFruit(Vector2 position) {
     for (int i = 0; i < MAX_FRUITS; i++) {
         if (!fruitPool[i].active) {
-            fruitPool[i].position.x = position.x;
-            fruitPool[i].position.y = position.y;
-            //fruitPool[i].position = position;
+            fruitPool[i].position = position;
             fruitPool[i].active = true;
             break; // Spawned one, stop looking
         }
@@ -272,6 +275,20 @@ typedef struct {
   Texture2D attack_heavy_sprite_back;
 
 } PlayerState;
+
+
+bool shouldCollect(Fruit *f) {
+  if (f->collision_timer >= 0.5f) {
+    return true;
+  } else {
+    return false;
+  }
+}
+void collectFruit(Fruit *f, PlayerState *player_state) {
+  f->active = false;
+  player_state->hp = fminf(player_state->hp + delta_hp_fruit, 1.0f);
+  f->collision_timer = 0;
+}
 
 typedef struct {
 
@@ -2142,83 +2159,83 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state, Sound *golem_attack,
   }
 
   if (golem->mode == MOB_DYING) {
-    //golem died, spawn fruit
-    Vector2 fruitPosition = {golem->hurtbox.x, golem->hurtbox.y};
-    SpawnFruit(fruitPosition);
-
-    fprintf(stderr, "spawnfruit function called, fruit should respawn in the next frame");
-
     if (golem->direction) {
-
+      
       golem->golem_death.time_passed += GetFrameTime();
-
+      
       if (golem->golem_death.time_passed >= golem->golem_death.time_needed) {
         golem->golem_death.current_frame_no++;
         golem->golem_death.time_passed = 0;
       }
-
+      
       if (golem->golem_death.current_frame_no == 2) {
         PlaySound(*golem_dead);
-
+        
       }
-
+      
       if (golem->golem_death.current_frame_no >
-          golem->golem_death.frame_count) {
-        golem->golem_death.current_frame_no = 1;
-        golem->mode = MOB_DEAD;
-        StopSound(*golem_dead);
-        return;
-      }
+        golem->golem_death.frame_count) {
+          golem->golem_death.current_frame_no = 1;
+          golem->mode = MOB_DEAD;
+          StopSound(*golem_dead);
 
-      golem->golem_death.current_frame_rec.x =
-          (golem->golem_death.current_frame_no - 1) *
-          golem->golem_death.current_frame_rec.width;
-
-      DrawTextureRec(
+          //dying to dead, spawn fruit
+          SpawnFruit((Vector2) {.x = golem->hurtbox.x, .y = golem->hurtbox.y});
+          return;
+        }
+        
+        golem->golem_death.current_frame_rec.x =
+        (golem->golem_death.current_frame_no - 1) *
+        golem->golem_death.current_frame_rec.width;
+        
+        DrawTextureRec(
           golem->golem_death.sprite, golem->golem_death.current_frame_rec,
           (Vector2){.x = golem->hurtbox.x - 25, .y = golem->hurtbox.y - 32},
           WHITE);
     }
-
+    
     else {
-
+      
       golem->golem_death_back.time_passed += GetFrameTime();
-
+      
       if (golem->golem_death_back.time_passed >=
-          golem->golem_death_back.time_needed) {
-        golem->golem_death_back.current_frame_no++;
-        golem->golem_death_back.time_passed = 0;
-      }
-
-      if (golem->golem_death_back.current_frame_no == 2) {
-        PlaySound(*golem_dead);
-      }
-
-      if (golem->golem_death_back.current_frame_no >
+        golem->golem_death_back.time_needed) {
+          golem->golem_death_back.current_frame_no++;
+          golem->golem_death_back.time_passed = 0;
+        }
+        
+        if (golem->golem_death_back.current_frame_no == 2) {
+          PlaySound(*golem_dead);
+        }
+        
+        if (golem->golem_death_back.current_frame_no >
           golem->golem_death_back.frame_count) {
-        golem->golem_death_back.current_frame_no = 1;
-        golem->mode = MOB_DEAD;
-        StopSound(*golem_dead);
-        return;
-      }
+            golem->golem_death_back.current_frame_no = 1;
+            golem->mode = MOB_DEAD;
+            StopSound(*golem_dead);
 
-      golem->golem_death_back.current_frame_rec.x =
+            //dying to dead, spawn fruit
+            SpawnFruit((Vector2) {.x = golem->hurtbox.x, .y = golem->hurtbox.y});
+            return;
+          }
+          
+          golem->golem_death_back.current_frame_rec.x =
           (golem->golem_death_back.current_frame_no - 1) *
           golem->golem_death_back.current_frame_rec.width;
-
-      DrawTextureRec(
-          golem->golem_death_back.sprite,
-          golem->golem_death_back.current_frame_rec,
-          (Vector2){.x = golem->hurtbox.x - 29, .y = golem->hurtbox.y - 32},
-          WHITE);
-    }
-  }
-
-  if (golem->mode == MOB_WALK) {
-
-    if (golem->direction) {
-
-      golem->golem_walk.time_passed += GetFrameTime();
+          
+          DrawTextureRec(
+            golem->golem_death_back.sprite,
+            golem->golem_death_back.current_frame_rec,
+            (Vector2){.x = golem->hurtbox.x - 29, .y = golem->hurtbox.y - 32},
+            WHITE);
+          }
+        }
+        
+        if (golem->mode == MOB_WALK) {
+          
+          if (golem->direction) {
+            
+            golem->golem_walk.time_passed += GetFrameTime();
 
       if (golem->golem_walk.time_passed >= golem->golem_walk.time_needed) {
         golem->golem_walk.current_frame_no++;
@@ -2783,6 +2800,9 @@ void DrawGolemR(MobGolemR *golemr, PlayerState *player_state,
         golemr->golemr_death.current_frame_no = 1;
         golemr->mode = MOB_DEAD;
         StopSound(*golemr_dead);
+
+        //golemr just died, spawn fruit
+        SpawnFruit((Vector2) {.x = golemr->hurtbox.x, .y = golemr->hurtbox.y});
         return;
       }
 
@@ -2815,6 +2835,9 @@ void DrawGolemR(MobGolemR *golemr, PlayerState *player_state,
         golemr->golemr_death_back.current_frame_no = 1;
         golemr->mode = MOB_DEAD;
         StopSound(*golemr_dead);
+
+        //golemr just died, spawn fruit
+        SpawnFruit((Vector2) {.x = golemr->hurtbox.x, .y = golemr->hurtbox.y});
         return;
       }
 
@@ -3518,6 +3541,7 @@ int main() {
   Sound sound_nature = LoadSound("resources/audio/nature.mp3");
   Sound sound_spear = LoadSound("resources/audio/spear.mp3");
   Sound sound_next_level = LoadSound("resources/audio/next_level.mp3");
+  Sound sound_fruit_collected = LoadSound("resources/audio/fruit_collected.mp3");
 
 
   SetTargetFPS(window.fps);
@@ -4322,11 +4346,15 @@ int main() {
               // // Change the width and height to 14.0f (slightly bigger than a 10px dot)
               // Rectangle fruit_rec = { fruitPool[i].position.x, fruitPool[i].position.y, 14.0f, 14.0f };
               // Rectangle dest = { fruitPool[i].position.x, fruitPool[i].position.y, 14.0f, 14.0f };
-              Rectangle fruit_rec = {fruitPool[i].position.x, fruitPool[i].position.y, fruitTexture.width, fruitTexture.height}; 
+              Rectangle fruit_rec = {fruitPool[i].position.x, fruitPool[i].position.y, 14.0f, 14.0f}; 
               if (CheckCollisionRecs(*player_state.player, fruit_rec)) {
-                  fruitPool[i].active = false;
-                  player_state.hp = fminf(player_state.hp+delta_hp_fruit, 1.0f);
-                  //continue; // Skip drawing if just collected
+                fruitPool[i].collision_timer += GetFrameTime();
+                if(shouldCollect(&fruitPool[i])) {
+                  collectFruit(&fruitPool[i], &player_state);
+                  PlaySound(sound_fruit_collected);
+                }
+              } else {
+                fruitPool[i].collision_timer = 0; // Reset timer if not colliding
               }
 
               // Drawing logic
@@ -4338,7 +4366,18 @@ int main() {
                 .width = 16,
                 .height = 16
               };
+
+              // #ifdef DEBUG
+              //   DrawRectangleRec(fruit_rec, RED);
+              // #endif
+
+              // #ifndef DEBUG
+              //   DrawTextureRec(fruitTexture, frame, fruitPool[i].position, WHITE);
+              // #endif
+
               DrawTextureRec(fruitTexture, frame, fruitPool[i].position, WHITE);
+              //DrawRectangleRec(fruit_rec, WHITE);
+
               //DrawTexture(fruitTexture, fruitPool[i].position.x, fruitPool[i].position.y, WHITE);
           }
       }
@@ -4441,6 +4480,7 @@ int main() {
   UnloadSound(sound_bullet_hit);
   UnloadSound(sound_spear);
   UnloadSound(sound_next_level);
+  UnloadSound(sound_fruit_collected);
 
   CloseAudioDevice();
 
