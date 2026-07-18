@@ -7,7 +7,7 @@
 #include <string.h>
 #include <time.h>
 
-// #define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #include <stdio.h>
@@ -467,6 +467,7 @@ void SpawnFruit(Vector2 position) {
     if (!fruitPool[i].active) {
       fruitPool[i].position = position;
       fruitPool[i].active = true;
+      fruitPool[i].collision_timer = 0;
       break; // Spawned one, stop looking
     }
   }
@@ -2182,10 +2183,6 @@ void DrawGolem(MobGolem *golem, PlayerState *player_state, Sound *golem_attack,
 
   if (golem->mode == MOB_DYING) {
 
-    // golem died, spawn fruit
-    Vector2 fruitPosition = {golem->hurtbox.x, golem->hurtbox.y};
-    SpawnFruit(fruitPosition);
-
     if (golem->direction) {
 
       golem->golem_death.time_passed += GetFrameTime();
@@ -3625,8 +3622,8 @@ int main() {
 
 #ifdef DEBUG
 
-  player_state.player->x = 37 * 32;
-  player_state.player->y = 0;
+  player_state.player->x = 20 * 32;
+  player_state.player->y = 80 * 32;
 
 #endif
 
