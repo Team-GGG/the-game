@@ -535,12 +535,12 @@ void ScoreAdd(Scoreboard *board, float time, char name[]) {
 
   if (board->count < 10) {
     limit = board->count;
-  } 
-  
+  }
+
   else {
     limit = 9;
   }
-  
+
   for (int i = limit; i > index; i--) {
 
     board->people[i] = board->people[i - 1];
@@ -4007,9 +4007,9 @@ int main() {
       .upper_bound = (Vector2){.x = 31 * tilemap.tileset->tile_width,
                                .y = 13 * tilemap.tileset->tile_height + 24},
 
-      .damage = 0.45,
+      .damage = 0.2,
       .walk_speed = 1,
-      .bullet_speed = 3,
+      .bullet_speed = 8,
       .idle_buffer = 0,
       .no_damage_time = 0,
 
@@ -4527,7 +4527,7 @@ int main() {
       DrawTextEx(font_press_start, "CONTROLS",
                  (Vector2){(GetScreenWidth() - ControlDim.x) / 2, 60}, 70, 2,
                  SKYBLUE);
-      DrawTextEx(font_jetbrains_mono, "A,S,D", (Vector2){1200, 200}, 45, 2,
+      DrawTextEx(font_jetbrains_mono, "A,D", (Vector2){1200, 200}, 45, 2,
                  YELLOW);
       DrawTextEx(font_jetbrains_mono, "Movement Keys", (Vector2){200, 200}, 45,
                  2, YELLOW);
@@ -4585,65 +4585,6 @@ int main() {
 
       BeginMode2D(camera);
 
-      // Draw fruit
-
-      for (int i = 0; i < MAX_FRUITS; i++) {
-        if (fruitPool[i].active) {
-          // Collision logic
-          // // Change the width and height to 14.0f (slightly bigger than a
-          // 10px dot)
-          Rectangle fruit_rec = {fruitPool[i].position.x,
-                                 fruitPool[i].position.y, 14.0f, 14.0f};
-
-          fruitPool[i].spawn_timer += GetFrameTime();
-
-          fprintf(stderr, "fruit spawn_timer: %f\n", fruitPool[i].spawn_timer);
-
-          if (fruitPool[i].spawn_timer >= FRUIT_LIFETIME) {
-            disappearFruit(&fruitPool[i]);
-          }
-
-          if (CheckCollisionRecs(*player_state.player, fruit_rec)) {
-            fruitPool[i].collision_timer += GetFrameTime();
-            if (fruitPool[i].spawn_timer >= FRUIT_LIFETIME / 2) {
-              fruitPool[i].spawn_timer -= (FRUIT_LIFETIME / 2);
-            }
-
-            if (shouldCollect(&fruitPool[i])) {
-              collectFruit(&fruitPool[i], &player_state);
-              PlaySound(sound_fruit_collected);
-            }
-
-          }
-
-          else {
-            fruitPool[i].collision_timer = 0; // Reset timer if not colliding
-          }
-
-          // Drawing logic
-
-          Rectangle frame = {.x = 0, .y = 0, .width = 16, .height = 16};
-
-          // #ifdef DEBUG
-          //   DrawRectangleRec(fruit_rec, RED);
-          // #endif
-
-          // #ifndef DEBUG
-          //   DrawTextureRec(fruitTexture, frame, fruitPool[i].position,
-          //   WHITE);
-          // #endif
-
-          if (fruitBlinking(fruitPool[i].spawn_timer)) {
-            continue;
-          }
-
-          DrawTextureRec(fruitTexture, frame, fruitPool[i].position, WHITE);
-          // DrawRectangleRec(fruit_rec, WHITE);
-
-          // DrawTexture(fruitTexture, fruitPool[i].position.x,
-          // fruitPool[i].position.y, WHITE);
-        }
-      }
 
       DrawRectangle(0, 0, 55 * 32, 48 * 32, (Color){162, 210, 228, 255});
       DrawClouds(clouds);
@@ -4651,9 +4592,6 @@ int main() {
       DrawTexture(bg2, 0, 43 * 32, WHITE);
       AnimateFountain(&fountain);
 
-      if (IsKeyDown(KEY_T)) {
-        ToggleFullscreen();
-      }
 
       ClearBackground(RAYWHITE);
 
@@ -4770,6 +4708,67 @@ int main() {
         }
         }
 
+        // Draw fruit
+
+        for (int i = 0; i < MAX_FRUITS; i++) {
+          if (fruitPool[i].active) {
+            // Collision logic
+            // // Change the width and height to 14.0f (slightly bigger than a
+            // 10px dot)
+            Rectangle fruit_rec = {fruitPool[i].position.x,
+                                   fruitPool[i].position.y, 14.0f, 14.0f};
+
+            fruitPool[i].spawn_timer += GetFrameTime();
+
+            fprintf(stderr, "fruit spawn_timer: %f\n", fruitPool[i].spawn_timer);
+
+            if (fruitPool[i].spawn_timer >= FRUIT_LIFETIME) {
+              disappearFruit(&fruitPool[i]);
+            }
+
+            if (CheckCollisionRecs(*player_state.player, fruit_rec)) {
+              fruitPool[i].collision_timer += GetFrameTime();
+              if (fruitPool[i].spawn_timer >= FRUIT_LIFETIME / 2) {
+                fruitPool[i].spawn_timer -= (FRUIT_LIFETIME / 2);
+              }
+
+              if (shouldCollect(&fruitPool[i])) {
+                collectFruit(&fruitPool[i], &player_state);
+                PlaySound(sound_fruit_collected);
+              }
+
+            }
+
+            else {
+              fruitPool[i].collision_timer = 0; // Reset timer if not colliding
+            }
+
+            // Drawing logic
+
+            Rectangle frame = {.x = 0, .y = 0, .width = 16, .height = 16};
+
+            // #ifdef DEBUG
+            //   DrawRectangleRec(fruit_rec, RED);
+            // #endif
+
+            // #ifndef DEBUG
+            //   DrawTextureRec(fruitTexture, frame, fruitPool[i].position,
+            //   WHITE);
+            // #endif
+
+            if (fruitBlinking(fruitPool[i].spawn_timer)) {
+              continue;
+            }
+
+            DrawTextureRec(fruitTexture, frame, fruitPool[i].position, WHITE);
+            // DrawRectangleRec(fruit_rec, WHITE);
+
+            // DrawTexture(fruitTexture, fruitPool[i].position.x,
+            // fruitPool[i].position.y, WHITE);
+          }
+        }
+
+
         if ((golem.mode != MOB_DEAD)) {
           DrawGolem(&golem, &player_state, &sound_golem_attack,
                     &sound_golem_dead);
@@ -4851,7 +4850,7 @@ int main() {
       float subFontSize = 40.0;
       float subSpacing = 2.0;
 
-      
+
 
       Vector2 subDim =
           MeasureTextEx(font_jetbrains_mono, subText, subFontSize, subSpacing);
@@ -4861,9 +4860,9 @@ int main() {
       float subX = (GetScreenWidth() - subDim.x) / 2.0;
       float subY =
           (GetScreenHeight() - subDim.y) / 2.0 -
-          ((quest1_complete) ? (40) : (0)); 
+          ((quest1_complete) ? (40) : (0));
 
-      
+
       DrawTextEx(font_jetbrains_mono, subText, (Vector2){.x = subX, .y = subY},
                  subFontSize, subSpacing, LIGHTGRAY);
 
@@ -4914,7 +4913,7 @@ int main() {
         boss.state_timer = 0;
         boss.current_frame_no = 0;
         boss.mode = IDLE_BOSS;
-        boss.hp = boss.hp;
+        boss.hp = bosshp;
         quest1_complete = 0;
         player_state.quest_1_complete = 0;
         ResetPlayerAirState(&player_state);
