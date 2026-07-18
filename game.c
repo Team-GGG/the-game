@@ -470,7 +470,7 @@ void SpawnFruit(Vector2 position) {
       fruitPool[i].position = position;
       fruitPool[i].active = true;
       fruitPool[i].collision_timer = 0;
-      fruitPool[i].spawn_timer = 0; 
+      fruitPool[i].spawn_timer = 0;
       break; // Spawned one, stop looking
     }
   }
@@ -483,8 +483,8 @@ bool shouldCollect(Fruit *f) {
     return false;
   }
 }
-void disappearFruit(Fruit *f) { 
-  f->active = false; 
+void disappearFruit(Fruit *f) {
+  f->active = false;
   f->collision_timer = 0;
   f->spawn_timer = 0;
 }
@@ -492,10 +492,10 @@ bool fruitBlinking(float spawn_timer) {
   float slow_blink_start = FRUIT_LIFETIME * 0.50f;
   float fast_blink_start = FRUIT_LIFETIME * 0.75f;
 
-  if(spawn_timer >= fast_blink_start) {
+  if (spawn_timer >= fast_blink_start) {
     int decimal_part = (int)(spawn_timer * 10) % 5;
     return decimal_part < 2;
-  } else if(spawn_timer >= slow_blink_start) {
+  } else if (spawn_timer >= slow_blink_start) {
     int decimal_part = (int)(spawn_timer * 10) % 10;
     return decimal_part < 5;
   }
@@ -1110,7 +1110,7 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
   Rectangle current_tile =
       (Rectangle){.x = 0, .y = 0, .width = 32, .height = 32};
 
-  bool is_grounded;
+  bool is_grounded = false;
 
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
@@ -1132,14 +1132,7 @@ void DrawPlatform(WindowState *window, PlatformState *platform,
       TileInformation tile_info = (TileInformation){
           .i = i, .j = j, .rows = rows, .cols = cols, .rec = &current_tile_rec};
 
-      if (!i && !j) {
-        is_grounded = CollisionResponse(&tile_info, player_state, data);
-
-      }
-
-      else {
-        is_grounded |= CollisionResponse(&tile_info, player_state, data);
-      }
+      is_grounded |= CollisionResponse(&tile_info, player_state, data);
 
       if (is_grounded) {
         ResetPlayerAirState(player_state);
@@ -3316,12 +3309,11 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
     }
 
     else if (random_num == 1) {
-      boss->mode = LASERATTACK_BOSS;
+      boss->mode = DEFEND_BOSS;
       boss->time_passed = 0.0;
       boss->current_frame_no = 1;
-      boss->state_timer = 1;
+      boss->state_timer = 2.5;
       boss->in_attack = true;
-      boss->attack_count--;
     }
 
     else if (random_num == 2) {
@@ -3329,11 +3321,12 @@ void UpdateBoss(Boss *boss, PlayerState *player_state) {
     }
 
     else {
-      boss->mode = DEFEND_BOSS;
+      boss->mode = LASERATTACK_BOSS;
       boss->time_passed = 0.0;
       boss->current_frame_no = 1;
-      boss->state_timer = 2.5;
+      boss->state_timer = 1;
       boss->in_attack = true;
+      boss->attack_count--;
     }
   }
 
@@ -3531,7 +3524,7 @@ void HandleAttackStatus(PlayerState *player_state) {
 
 int main() {
 
-  float bosshp = 0.05;
+  float bosshp = 1;
 
   srand(time(NULL));
 
@@ -4276,8 +4269,6 @@ int main() {
         menu = OPTIONS_MENU;
       }
 
-
-
     } else if (menu == OPTIONS_MENU) {
 
       Vector2 mouse = GetMousePosition();
@@ -4584,6 +4575,66 @@ int main() {
 
       BeginMode2D(camera);
 
+      // Draw fruit
+
+      for (int i = 0; i < MAX_FRUITS; i++) {
+        if (fruitPool[i].active) {
+          // Collision logic
+          // // Change the width and height to 14.0f (slightly bigger than a
+          // 10px dot)
+          Rectangle fruit_rec = {fruitPool[i].position.x,
+                                 fruitPool[i].position.y, 14.0f, 14.0f};
+
+          fruitPool[i].spawn_timer += GetFrameTime();
+
+          fprintf(stderr, "fruit spawn_timer: %f\n", fruitPool[i].spawn_timer);
+
+          if (fruitPool[i].spawn_timer >= FRUIT_LIFETIME) {
+            disappearFruit(&fruitPool[i]);
+          }
+
+          if (CheckCollisionRecs(*player_state.player, fruit_rec)) {
+            fruitPool[i].collision_timer += GetFrameTime();
+            if (fruitPool[i].spawn_timer >= FRUIT_LIFETIME / 2) {
+              fruitPool[i].spawn_timer -= (FRUIT_LIFETIME / 2);
+            }
+
+            if (shouldCollect(&fruitPool[i])) {
+              collectFruit(&fruitPool[i], &player_state);
+              PlaySound(sound_fruit_collected);
+            }
+
+          }
+
+          else {
+            fruitPool[i].collision_timer = 0; // Reset timer if not colliding
+          }
+
+          // Drawing logic
+
+          Rectangle frame = {.x = 0, .y = 0, .width = 16, .height = 16};
+
+          // #ifdef DEBUG
+          //   DrawRectangleRec(fruit_rec, RED);
+          // #endif
+
+          // #ifndef DEBUG
+          //   DrawTextureRec(fruitTexture, frame, fruitPool[i].position,
+          //   WHITE);
+          // #endif
+
+          if (fruitBlinking(fruitPool[i].spawn_timer)) {
+            continue;
+          }
+
+          DrawTextureRec(fruitTexture, frame, fruitPool[i].position, WHITE);
+          // DrawRectangleRec(fruit_rec, WHITE);
+
+          // DrawTexture(fruitTexture, fruitPool[i].position.x,
+          // fruitPool[i].position.y, WHITE);
+        }
+      }
+
       DrawRectangle(0, 0, 55 * 32, 48 * 32, (Color){162, 210, 228, 255});
       DrawClouds(clouds);
       DrawTexture(bg1, 3 * 32, 0, WHITE);
@@ -4626,69 +4677,6 @@ int main() {
 #ifdef DEBUG
       DrawRectangleRec(player, RED);
 #endif
-
-      // Draw fruit
-
-      for (int i = 0; i < MAX_FRUITS; i++) {
-        if (fruitPool[i].active) {
-          // Collision logic
-          // // Change the width and height to 14.0f (slightly bigger than a
-          // 10px dot)
-          Rectangle fruit_rec = {fruitPool[i].position.x,
-                                 fruitPool[i].position.y, 14.0f, 14.0f};
-
-          fruitPool[i].spawn_timer += GetFrameTime();
-
-          fprintf(stderr, "fruit spawn_timer: %f\n", fruitPool[i].spawn_timer);
-
-          if(fruitPool[i].spawn_timer >= FRUIT_LIFETIME) {
-            disappearFruit(&fruitPool[i]);
-          }
-
-
-
-          if (CheckCollisionRecs(*player_state.player, fruit_rec)) {
-            fruitPool[i].collision_timer += GetFrameTime();
-            if(fruitPool[i].spawn_timer >= FRUIT_LIFETIME / 2) {
-              fruitPool[i].spawn_timer -= (FRUIT_LIFETIME / 2);
-            }
-
-            if (shouldCollect(&fruitPool[i])) {
-              collectFruit(&fruitPool[i], &player_state);
-              PlaySound(sound_fruit_collected);
-            }
-
-          }
-
-          else {
-            fruitPool[i].collision_timer = 0; // Reset timer if not colliding
-          }
-
-          // Drawing logic
-
-          Rectangle frame = {.x = 0, .y = 0, .width = 16, .height = 16};
-
-          // #ifdef DEBUG
-          //   DrawRectangleRec(fruit_rec, RED);
-          // #endif
-
-          // #ifndef DEBUG
-          //   DrawTextureRec(fruitTexture, frame, fruitPool[i].position,
-          //   WHITE);
-          // #endif
-
-          if(fruitBlinking(fruitPool[i].spawn_timer)) {
-            continue;
-          }
-
-
-          DrawTextureRec(fruitTexture, frame, fruitPool[i].position, WHITE);
-          // DrawRectangleRec(fruit_rec, WHITE);
-
-          // DrawTexture(fruitTexture, fruitPool[i].position.x,
-          // fruitPool[i].position.y, WHITE);
-        }
-      }
 
       if ((!player_state.in_attack_heavy) &&
           (player_state.in_attack_light ||
@@ -4823,7 +4811,6 @@ int main() {
       DrawBossLaser(&boss_laser, &boss);
       HandleAttackStatus(&player_state);
 
-
       EndMode2D();
 
       EndDrawing();
@@ -4832,7 +4819,6 @@ int main() {
         player_state.hp = 0;
         StopSound(sound_walking);
       }
-
     }
 
     if (player_state.hp <= 0) {
@@ -4950,12 +4936,11 @@ int main() {
         boss.state_timer = 0;
         boss.current_frame_no = 0;
         boss.mode = IDLE_BOSS;
-        boss.hp = boss.hp;
+        boss.hp = bosshp;
         ResetPlayerAirState(&player_state);
       }
     }
   }
-
 
   StopSound(sound_nature);
   UnloadSound(sound_win);
