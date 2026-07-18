@@ -4462,6 +4462,7 @@ int main() {
         ScoreWrite(&board);
 
         // RESETING EVERYTHING
+        buffer[0] = '\0';
         menu = MAIN_MENU;
         player_state.player->y = 65 * 32;
 
@@ -4541,7 +4542,7 @@ int main() {
       // if (IsKeyPressed(KEY_Y)) {
       // menu = SCOREBOARD_MENU;
       //}
-      if (boss.hp <= 0) {
+      if (boss.hp <= -0.05) {
         PlaySound(sound_win);
         menu = INPUT_MENU;
       }
