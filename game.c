@@ -7,7 +7,7 @@
 #include <string.h>
 #include <time.h>
 
-//#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
 #include <stdio.h>
@@ -4822,8 +4822,12 @@ int main() {
       if (IsKeyPressed(KEY_R)) {
 
         menu = GAME_MENU;
-        player_state.player->y = 1000;
 
+        for (int i = 0; i < MAX_FRUITS; i++) {
+          fruitPool[i].active = 0;
+        }
+
+        player_state.player->y = 1000;
         player_state.player->x =
             0; // Need to reset all other (x,speed etc) too , but I think it
         // will be better to write a deathfunction and handle this using
