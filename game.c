@@ -511,16 +511,24 @@ void ScoreAdd(Scoreboard *board, float time, char name[]) {
     index++;
   }
   int limit;
+
   if (board->count < 10) {
     limit = board->count;
-  } else {
+  } 
+  
+  else {
     limit = 9;
   }
+  
   for (int i = limit; i > index; i--) {
+
     board->people[i] = board->people[i - 1];
+
   }
+
   strcpy(board->people[index].name, name);
   board->people[index].time = time;
+
   if (board->count < 10) {
     board->count++;
   }
@@ -4825,7 +4833,7 @@ int main() {
       float subFontSize = 40.0;
       float subSpacing = 2.0;
 
-      // Calculate horizontal centering for the subtitle
+      
 
       Vector2 subDim =
           MeasureTextEx(font_jetbrains_mono, subText, subFontSize, subSpacing);
@@ -4835,10 +4843,9 @@ int main() {
       float subX = (GetScreenWidth() - subDim.x) / 2.0;
       float subY =
           (GetScreenHeight() - subDim.y) / 2.0 -
-          ((quest1_complete) ? (40) : (0)); // Positioned in the lower half
+          ((quest1_complete) ? (40) : (0)); 
 
-      // Draw the subtitle text
-      // DrawText(subText, subX, subY, subFontSize, LIGHTGRAY);
+      
       DrawTextEx(font_jetbrains_mono, subText, (Vector2){.x = subX, .y = subY},
                  subFontSize, subSpacing, LIGHTGRAY);
 
