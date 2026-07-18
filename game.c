@@ -14,6 +14,7 @@
 #endif
 
 #define FRUIT_PATH "resources/fruits/fruits.png"
+#define FRUIT_LIFETIME 30.0f
 #define DELTA_HP_FRUIT 0.3f
 
 #define MAX_FRUITS 10
@@ -23,6 +24,7 @@ typedef struct {
   Texture2D texture;
   bool active;
   float collision_timer;
+  float spawn_timer;
 } Fruit;
 
 Fruit fruitPool[MAX_FRUITS] = {0}; // Sets all active states to false initially
@@ -468,6 +470,7 @@ void SpawnFruit(Vector2 position) {
       fruitPool[i].position = position;
       fruitPool[i].active = true;
       fruitPool[i].collision_timer = 0;
+      fruitPool[i].spawn_timer = 0; 
       break; // Spawned one, stop looking
     }
   }
@@ -479,6 +482,24 @@ bool shouldCollect(Fruit *f) {
   } else {
     return false;
   }
+}
+void disappearFruit(Fruit *f) { 
+  f->active = false; 
+  f->collision_timer = 0;
+  f->spawn_timer = 0;
+}
+bool fruitBlinking(float spawn_timer) {
+  float slow_blink_start = FRUIT_LIFETIME * 0.50f;
+  float fast_blink_start = FRUIT_LIFETIME * 0.75f;
+
+  if(spawn_timer >= fast_blink_start) {
+    int decimal_part = (int)(spawn_timer * 10) % 5;
+    return decimal_part < 2;
+  } else if(spawn_timer >= slow_blink_start) {
+    int decimal_part = (int)(spawn_timer * 10) % 10;
+    return decimal_part < 5;
+  }
+  return false;
 }
 
 void collectFruit(Fruit *f, PlayerState *player_state) {
@@ -4541,8 +4562,6 @@ int main() {
 
       // Draw fruit
 
-      // Draw fruit
-
       for (int i = 0; i < MAX_FRUITS; i++) {
         if (fruitPool[i].active) {
           // Collision logic
@@ -4551,13 +4570,21 @@ int main() {
           Rectangle fruit_rec = {fruitPool[i].position.x,
                                  fruitPool[i].position.y, 14.0f, 14.0f};
 
+          fruitPool[i].spawn_timer += GetFrameTime();
+
+          fprintf(stderr, "fruit spawn_timer: %f\n", fruitPool[i].spawn_timer);
+
+          if(fruitPool[i].spawn_timer >= FRUIT_LIFETIME) {
+            disappearFruit(&fruitPool[i]);
+          }
+
+
+
           if (CheckCollisionRecs(*player_state.player, fruit_rec)) {
-            fruitPool[i].active = false;
-
-            player_state.hp = fminf(player_state.hp + DELTA_HP_FRUIT, 1.0f);
-            // continue; // Skip drawing if just collected
-
             fruitPool[i].collision_timer += GetFrameTime();
+            if(fruitPool[i].spawn_timer >= FRUIT_LIFETIME / 2) {
+              fruitPool[i].spawn_timer -= (FRUIT_LIFETIME / 2);
+            }
 
             if (shouldCollect(&fruitPool[i])) {
               collectFruit(&fruitPool[i], &player_state);
@@ -4582,6 +4609,11 @@ int main() {
           //   DrawTextureRec(fruitTexture, frame, fruitPool[i].position,
           //   WHITE);
           // #endif
+
+          if(fruitBlinking(fruitPool[i].spawn_timer)) {
+            continue;
+          }
+
 
           DrawTextureRec(fruitTexture, frame, fruitPool[i].position, WHITE);
           // DrawRectangleRec(fruit_rec, WHITE);
