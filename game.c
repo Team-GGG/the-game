@@ -1668,7 +1668,7 @@ void DrawHP(PlayerState *player_state) {
     color = (Color){22, 196, 127, 255};
   }
 
-  else if (player_state->hp <= 0.56 && player_state->hp >= 20.6) {
+  else if (player_state->hp <= 0.56 && player_state->hp >= .206) {
     color = (Color){255, 214, 90, 255};
   }
 
@@ -2072,7 +2072,7 @@ void DrawGolemHP(MobGolem *golem) {
     color = (Color){22, 196, 127, 255};
   }
 
-  else if (golem->hp <= 0.56 && golem->hp >= 20.6) {
+  else if (golem->hp <= 0.56 && golem->hp >= 0.206) {
     color = (Color){255, 214, 90, 255};
   }
 
@@ -2564,7 +2564,7 @@ void DrawGolemRHP(MobGolemR *golemr) {
     color = (Color){22, 196, 127, 255};
   }
 
-  else if (golemr->hp <= 0.56 && golemr->hp >= 20.6) {
+  else if (golemr->hp <= 0.56 && golemr->hp >= .206) {
     color = (Color){255, 214, 90, 255};
   }
 
