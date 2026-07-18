@@ -4871,7 +4871,7 @@ int main() {
         ResetPlayerAirState(&player_state);
       }
 
-      if (IsKeyPressed(KEY_R)) {
+      else if (IsKeyPressed(KEY_R) && quest1_complete) {
 
         menu = GAME_MENU;
 
