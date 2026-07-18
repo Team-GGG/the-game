@@ -3430,7 +3430,7 @@ void HandleFlag(Flag *flag, PlayerState *player_state, Sound *next_level) {
   if (SimpleCollisionCheck(player_state->player, &flag->hurtbox)) {
     player_state->quest_1_complete = 2;
     quest1_complete = 1;
-    
+
     player_state->level = 2;
 
     player_state->player->x = 0;
@@ -3441,7 +3441,6 @@ void HandleFlag(Flag *flag, PlayerState *player_state, Sound *next_level) {
 }
 
 int main() {
-  
 
   srand(time(NULL));
 
@@ -3518,7 +3517,7 @@ int main() {
                                         .height = 71 * tileset.tile_height};
 
   Rectangle player =
-      (Rectangle){.x = 1200, .y =  0 * 32, .width = 32, .height = 64};
+      (Rectangle){.x = 0, .y = 65 * 32, .width = 32, .height = 64};
   PlayerState player_state = (PlayerState){
       .player = &player,
       .speed = 5.7,
@@ -4074,6 +4073,8 @@ int main() {
 
   while (!WindowShouldClose() && should_exit) {
 
+  // printf("speedrun: %f + quest_status: %d\n", speedrun_time, quest1_complete);
+
     if (player_state.quest_1_complete > 0) {
       player_state.quest_1_complete -= GetFrameTime();
       menu = QUEST_1_MENU;
@@ -4117,8 +4118,6 @@ int main() {
     }
     if (is_transitioning) {
       transition_timer += GetFrameTime();
-      printf("%d", transition_timer);
-      printf("%d", is_transitioning);
 
       if (transition_timer < 0.5) {
 
@@ -4307,8 +4306,6 @@ int main() {
 
         char timeStr[16];
         int total = (int)board.people[i].time;
-        snprintf(timeStr, sizeof(timeStr), "%d:%02d:%02d", total / 3600,
-                 (total % 3600) / 60, total % 60);
 
         DrawTextEx(font_jetbrains_mono, TextFormat("%d.", i + 1),
                    (Vector2){row.x + 12, row.y + 8}, 22, 1, LIGHTGRAY);
@@ -4627,9 +4624,11 @@ int main() {
     }
 
     if (player_state.hp <= 0) {
-      if(!quest1_complete){
+
+      if (!quest1_complete) {
         speedrun_time = 0;
       }
+
       if (!player_state.death_sound) {
         PlaySound(death_scream);
         player_state.death_sound = true;
@@ -4639,7 +4638,8 @@ int main() {
       BeginDrawing();
       ClearBackground(GetColor(0x590404FF));
 
-      const char *subText = "Press Enter to Go to Main Menu";
+      const char *subText = "Press 'Enter' to Go to Main Menu";
+      const char *subText2 = "Press 'R' to Respawn at Checkpoint";
       float subFontSize = 40.0;
       float subSpacing = 2.0;
 
@@ -4647,33 +4647,41 @@ int main() {
 
       Vector2 subDim =
           MeasureTextEx(font_jetbrains_mono, subText, subFontSize, subSpacing);
+      Vector2 sub2Dim =
+          MeasureTextEx(font_jetbrains_mono, subText2, subFontSize, subSpacing);
 
       float subX = (GetScreenWidth() - subDim.x) / 2.0;
       float subY =
-          (GetScreenHeight() - subDim.y) / 2.0; // Positioned in the lower half
+          (GetScreenHeight() - subDim.y) / 2.0 -
+          ((quest1_complete) ? (40) : (0)); // Positioned in the lower half
 
       // Draw the subtitle text
       // DrawText(subText, subX, subY, subFontSize, LIGHTGRAY);
       DrawTextEx(font_jetbrains_mono, subText, (Vector2){.x = subX, .y = subY},
                  subFontSize, subSpacing, LIGHTGRAY);
 
+      if (quest1_complete) {
+
+        float sub2X = (GetScreenWidth() - sub2Dim.x) / 2.0;
+        float sub2Y = (GetScreenHeight() - sub2Dim.y) / 2.0 +
+                      40; // Positioned in the lower half
+
+        DrawTextEx(font_jetbrains_mono, subText2,
+                   (Vector2){.x = sub2X, .y = sub2Y}, subFontSize, subSpacing,
+                   LIGHTGRAY);
+      }
+
       EndDrawing();
 
       if (IsKeyPressed(KEY_ENTER)) {
-        menu = MAIN_MENU;
-
-        if (player_state.level == 2) {
-          player_state.player->y = 1000;
-        }
-
-        else {
-          player_state.player->y = 65 * 32;
-        }
 
 #ifdef DEBUG
         player_state.player->x = 40 * 32;
         player_state.player->y = 0;
 #endif
+
+        menu = MAIN_MENU;
+        player_state.player->y = 65 * 32;
 
         player_state.player->x =
             0; // Need to reset all other (x,speed etc) too , but I think it
@@ -4696,8 +4704,41 @@ int main() {
         boss.current_frame_no = 0;
         boss.mode = IDLE_BOSS;
         boss.hp = 1;
+        quest1_complete = 0;
+        player_state.quest_1_complete = 0;
         ResetPlayerAirState(&player_state);
       }
+
+      if(IsKeyPressed(KEY_R)){
+
+          menu = GAME_MENU;
+          player_state.player->y = 1000;
+
+          player_state.player->x =
+              0; // Need to reset all other (x,speed etc) too , but I think it
+          // will be better to write a deathfunction and handle this using
+          // that instead of everything else
+
+          player_state.death_sound = false;
+          player_state.camera_shake = false;
+          player_state.camera_shake_time = 0;
+          player_state.last_direction = 1;
+          player_state.in_jump = 0;
+          player_state.in_attack_light = 0;
+          player_state.in_attack_heavy = 0;
+          player_state.hp = 1;
+          golem.hp = 1;
+          golem.mode = MOB_WALK;
+          golemr.hp = 1;
+          golemr.mode = MOB_WALK;
+          boss.state_timer = 0;
+          boss.current_frame_no = 0;
+          boss.mode = IDLE_BOSS;
+          boss.hp = 1;
+          ResetPlayerAirState(&player_state);
+      }
+
+
     }
   }
 
